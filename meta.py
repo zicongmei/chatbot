@@ -5,7 +5,8 @@ from pathlib import Path
 
 
 model_name = "meta-llama/Llama-2-7b-chat-hf"
-device = "cuda"
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 access_token = Path("token").read_text().strip()
 
@@ -50,4 +51,3 @@ while True:
         output_token_ids, skip_special_tokens=True)[0]
     print("== ", responses)
     conversation_history.append({"role": "bot", "content": responses})
-
