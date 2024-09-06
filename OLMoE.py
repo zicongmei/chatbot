@@ -1,4 +1,4 @@
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, AutoModelForCausalLM
+from transformers import OlmoeForCausalLM, AutoTokenizer
 import torch
 
 # model_name = "01-ai/Yi-Coder-9B-Chat"
@@ -7,7 +7,7 @@ model_name = "openbmb/MiniCPM3-4B"
 device = "cuda"
 
 tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-model = AutoModelForCausalLM.from_pretrained(
+model = OlmoeForCausalLM.from_pretrained(
     model_name, torch_dtype=torch.bfloat16, device_map=device, trust_remote_code=True)
 
 print("loaded model.")
