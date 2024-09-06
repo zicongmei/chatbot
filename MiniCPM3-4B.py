@@ -1,5 +1,5 @@
 from causallm import run
 
-model_name = "meta-llama/Llama-2-7b-chat-hf"
+model_name = "openbmb/MiniCPM3-4B"
 
 run(model_name=model_name)
