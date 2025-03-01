@@ -10,9 +10,18 @@ def generate_response(prompt):
     Make sure that Ollama is installed and Deepseek is set up locally.
     """
     try:
-        r = requests.post('http://httpbin.org/post', json={"key": "value"})
+        r = requests.post('http://localhost:11434/api/chat', json={
+            "model": "deepseek-r1:14b",
+            "messages": [
+                {
+                "role": "user",
+                "content": prompt
+                }
+            ],
+            "stream": False
+            })
         # if r.status_code != 200:
-        response = r.json()
+        response = r.json()['message']['content']
     except Exception as e:
         response = f"Error generating response: {e}"
 
