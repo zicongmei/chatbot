@@ -111,7 +111,7 @@
             border-radius: 18px;
             position: relative;
             word-wrap: break-word;
-            min-height: 20px; /* Ensure contenteditable has some height */
+            min-height: 20px; /* Ensure content has some height */
         }
         .message-bubble.user-message {
             background-color: #dcf8c6;
@@ -125,14 +125,51 @@
             margin-right: auto;
             border-bottom-left-radius: 2px;
         }
-        .message-bubble[contenteditable="true"]:focus {
-            outline: 2px solid #4CAF50;
-            background-color: #fffacd; /* Light yellow to indicate edit mode */
-        }
-        /* Style for the <p> tag within contenteditable bubble */
+        /* Removed contenteditable specific styles as we're using a separate raw editor */
         .message-bubble p {
             margin: 0;
         }
+
+        /* New styles for raw chat history section */
+        .raw-chat-history-section {
+            margin-top: 10px;
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #f8f9fa; /* Light grey */
+        }
+        .raw-chat-history-section label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #333;
+        }
+        .raw-chat-history-section textarea {
+            width: calc(100% - 22px); /* Account for padding and border */
+            min-height: 150px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9em;
+            resize: vertical; /* Allow vertical resizing */
+            margin-bottom: 10px;
+        }
+        .raw-chat-history-section button {
+            padding: 10px 15px;
+            background-color: #ffc107; /* Warning yellow */
+            color: #333;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+        }
+        .raw-chat-history-section button:hover {
+            background-color: #e0a800; /* Darker yellow */
+        }
+
 
         .chat-input-area {
             display: flex;
@@ -170,4 +207,14 @@
             margin-top: 5px;
             text-align: center;
             height: 20px; /* Reserve space for error message */
+        }
+        .token-stats {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+            text-align: center;
+            font-size: 0.9em;
+            color: #555;
+            min-height: 20px; /* Ensure it takes up space even if empty */
         }
