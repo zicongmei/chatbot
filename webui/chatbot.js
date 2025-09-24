@@ -94,6 +94,7 @@ function saveSystemInstruction() {
     systemInstruction = systemInstructionInput.value.trim();
     setLocalStorageItem('systemInstruction', systemInstruction);
     console.log('System instruction saved.');
+    updateRawHistoryInput(); // Update raw history display when system instruction changes
 }
 
 // Function to load system instruction from localStorage
@@ -130,13 +131,12 @@ function loadChatHistoryFromLocalStorage() {
             chatHistory = []; // Reset on error
         }
     }
-    // If no history in localStorage or parsing error, initialize with welcome message
-    if (chatHistory.length === 0) {
-        const initialWelcomeMessageElement = chatHistoryDiv.querySelector('.welcome-message p');
-        if (initialWelcomeMessageElement) {
-            const welcomeText = initialWelcomeMessageElement.textContent.trim();
-            chatHistory.push({ role: 'model', parts: [{ text: welcomeText }] });
-        }
+    // If no history in localStorage or parsing error, or history is empty after loading,
+    // and there's no system instruction already providing context, add a welcome message.
+    if (chatHistory.length === 0 && !systemInstruction) {
+        chatHistory.push({ role: 'model', parts: [{ text: 'Hello! Please enter your Gemini API key and select a model above to start chatting.' }] });
+        console.log('Initialized chat history with a welcome message.');
+        saveChatHistoryToLocalStorage(); // Save this initial state
     }
 }
 
@@ -144,9 +144,13 @@ function loadChatHistoryFromLocalStorage() {
 function updateRawHistoryInput() {
     if (rawChatHistoryInput) {
         try {
-            rawChatHistoryInput.value = JSON.stringify(chatHistory, null, 2); // Pretty print JSON
+            const dataToDisplay = {
+                systemInstruction: systemInstruction,
+                chatHistory: chatHistory
+            };
+            rawChatHistoryInput.value = JSON.stringify(dataToDisplay, null, 2); // Pretty print JSON
         } catch (e) {
-            console.error("Error stringifying chat history:", e);
+            console.error("Error stringifying chat history for raw input:", e);
             rawChatHistoryInput.value = "Error: Could not display chat history as JSON.";
         }
     }
@@ -158,19 +162,36 @@ function applyRawHistory() {
 
     const rawText = rawChatHistoryInput.value;
     try {
-        const parsedHistory = JSON.parse(rawText);
-        if (!Array.isArray(parsedHistory) || !parsedHistory.every(item => item.role && Array.isArray(item.parts))) {
-            throw new Error("Invalid chat history format. Expected an array of objects with 'role' and 'parts'.");
+        const parsedData = JSON.parse(rawText);
+
+        if (typeof parsedData !== 'object' || parsedData === null) {
+            throw new Error("Invalid JSON format. Expected an object with 'systemInstruction' and 'chatHistory'.");
         }
-        chatHistory = parsedHistory;
-        renderChatHistory(); // Re-render chat bubbles based on new history
-        saveChatHistoryToLocalStorage(); // Save updated history
-        errorMessageDiv.textContent = 'Chat history applied successfully!';
+
+        // Apply system instruction
+        const newSystemInstruction = parsedData.systemInstruction || '';
+        if (typeof newSystemInstruction !== 'string') {
+            throw new Error("Invalid 'systemInstruction' format. Expected a string.");
+        }
+        systemInstruction = newSystemInstruction;
+        systemInstructionInput.value = systemInstruction;
+        setLocalStorageItem('systemInstruction', systemInstruction); // Save to local storage
+
+        // Apply chat history
+        const newChatHistory = parsedData.chatHistory;
+        if (!Array.isArray(newChatHistory) || !newChatHistory.every(item => item.role && Array.isArray(item.parts))) {
+            throw new Error("Invalid 'chatHistory' format. Expected an array of objects with 'role' and 'parts'.");
+        }
+        chatHistory = newChatHistory;
+        renderChatHistory(); // Re-render chat bubbles based on new history (implicitly calls updateRawHistoryInput)
+        saveChatHistoryToLocalStorage(); // Save updated history to local storage
+
+        errorMessageDiv.textContent = 'Chat history and system instruction applied successfully!';
         setTimeout(() => errorMessageDiv.textContent = '', 3000);
-        console.log('Chat history updated from raw input.');
+        console.log('Chat history and system instruction updated from raw input.');
     } catch (error) {
         console.error('Error applying raw chat history:', error);
-        errorMessageDiv.textContent = `Error applying chat history: ${error.message}`;
+        errorMessageDiv.textContent = `Error applying raw chat history: ${error.message}`;
     }
 }
 
@@ -191,7 +212,7 @@ function renderChatHistory() {
     // Scroll to the bottom
     chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
 
-    updateRawHistoryInput();
+    updateRawHistoryInput(); // Ensure raw history input is updated after rendering
 }
 
 // Function to render accumulated token stats
@@ -224,16 +245,12 @@ async function sendMessage() {
     try {
         const API_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`;
 
-        // Prepend system instruction if available
+        // Prepend system instruction if available for the API call
         const conversationContent = [...chatHistory];
         if (systemInstruction) {
             // For Gemini models, system instructions are typically handled by inserting an initial user message.
-            // Some models might interpret a user message as system instruction if it's the very first.
-            // A common pattern is user: [system instruction] -> model: [empty/acknowledgement]
-            // For simplicity, we'll just prepend it as a user message.
+            // This does not modify the persistent chatHistory or displayed raw history.
             conversationContent.unshift({ role: 'user', parts: [{ text: systemInstruction }] });
-            // If the model expects a paired empty model response to set the context, you might add:
-            // conversationContent.unshift({ role: 'model', parts: [{ text: '' }] });
         }
 
 
@@ -307,13 +324,19 @@ function adjustTextareaHeight() {
 
 // Function to download chat history as a JSON file
 function downloadChatHistory() {
-    if (chatHistory.length === 0) {
-        errorMessageDiv.textContent = "No chat history to save.";
+    if (chatHistory.length === 0 && !systemInstruction) {
+        errorMessageDiv.textContent = "No chat history or system instruction to save.";
         setTimeout(() => errorMessageDiv.textContent = '', 3000);
         return;
     }
+
+    const dataToSave = {
+        systemInstruction: systemInstruction,
+        chatHistory: chatHistory
+    };
+
     const filename = `gemini_chat_history_${new Date().toISOString().slice(0, 10)}.json`;
-    const jsonStr = JSON.stringify(chatHistory, null, 2);
+    const jsonStr = JSON.stringify(dataToSave, null, 2);
     const blob = new Blob([jsonStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -323,7 +346,7 @@ function downloadChatHistory() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    errorMessageDiv.textContent = "Chat history saved to file.";
+    errorMessageDiv.textContent = "Chat history and system instruction saved to file.";
     setTimeout(() => errorMessageDiv.textContent = '', 3000);
 }
 
@@ -337,14 +360,27 @@ function handleChatFileLoad(event) {
     const reader = new FileReader();
     reader.onload = (e) => {
         try {
-            const loadedHistory = JSON.parse(e.target.result);
-            if (!Array.isArray(loadedHistory) || !loadedHistory.every(item => item.role && Array.isArray(item.parts))) {
-                throw new Error("Invalid chat history file format. Expected an array of objects with 'role' and 'parts'.");
+            const loadedData = JSON.parse(e.target.result);
+            // Validate the structure
+            if (typeof loadedData !== 'object' || loadedData === null || !Array.isArray(loadedData.chatHistory)) {
+                throw new Error("Invalid chat history file format. Expected an object with 'systemInstruction' and an array 'chatHistory'.");
             }
-            chatHistory = loadedHistory;
-            renderChatHistory();
-            saveChatHistoryToLocalStorage(); // Save loaded history to local storage
-            errorMessageDiv.textContent = "Chat history loaded from file successfully!";
+
+            // Update system instruction
+            systemInstruction = loadedData.systemInstruction || '';
+            systemInstructionInput.value = systemInstruction;
+            setLocalStorageItem('systemInstruction', systemInstruction);
+
+            // Update chat history
+            const newChatHistory = loadedData.chatHistory;
+            if (!newChatHistory.every(item => item.role && Array.isArray(item.parts))) {
+                throw new Error("Invalid chat history entries within the file.");
+            }
+            chatHistory = newChatHistory;
+            
+            renderChatHistory(); // This will also call updateRawHistoryInput indirectly
+            saveChatHistoryToLocalStorage(); // Save loaded chatHistory to local storage
+            errorMessageDiv.textContent = "Chat history and system instruction loaded from file successfully!";
         } catch (error) {
             console.error('Error loading chat history from file:', error);
             errorMessageDiv.textContent = `Error loading chat history from file: ${error.message}`;
