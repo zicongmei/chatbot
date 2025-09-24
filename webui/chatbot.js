@@ -1,8 +1,9 @@
 // chatbot.js
 
 let chatHistory = [];
-let currentApiKey = ''; // Store the API key
-let selectedModel = 'gemini-2.5-flash-lite'; // Default model changed to gemini-2.5-flash-lite
+let currentApiKey = '';
+let selectedModel = 'gemini-2.5-flash-lite';
+let systemInstruction = ''; // New variable for system instruction
 
 let totalInputTokens = 0;
 let totalOutputTokens = 0;
@@ -10,35 +11,46 @@ let totalOutputTokens = 0;
 // Get DOM elements
 const geminiApiKeyInput = document.getElementById('geminiApiKey');
 const setApiKeyButton = document.getElementById('setApiKeyButton');
-const geminiModelSelect = document.getElementById('geminiModel'); // New element
+const geminiModelSelect = document.getElementById('geminiModel');
 const chatHistoryDiv = document.getElementById('chatHistory');
 const messageInput = document.getElementById('messageInput');
 const sendMessageButton = document.getElementById('sendMessageButton');
 const errorMessageDiv = document.getElementById('errorMessage');
-const tokenStatsDiv = document.getElementById('tokenStats'); // New element for token stats
+const tokenStatsDiv = document.getElementById('tokenStats');
 
-// New DOM elements for raw chat history
+// DOM elements for raw chat history
 const rawChatHistoryInput = document.getElementById('rawChatHistoryInput');
 const applyRawHistoryButton = document.getElementById('applyRawHistoryButton');
 
+// New DOM elements for system instruction
+const systemInstructionInput = document.getElementById('systemInstructionInput');
 
-// Utility functions for cookies
-function setCookie(name, value, days) {
-    const d = new Date();
-    d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
-    const expires = "expires=" + d.toUTCString();
-    document.cookie = name + "=" + encodeURIComponent(value) + ";" + expires + ";path=/;SameSite=Lax";
+// New DOM elements for chat save/load
+const saveChatButton = document.getElementById('saveChatButton');
+const loadChatButton = document.getElementById('loadChatButton');
+const loadChatFileInput = document.getElementById('loadChatFileInput');
+
+
+// Utility functions for localStorage
+function setLocalStorageItem(name, value) {
+    try {
+        localStorage.setItem(name, value);
+    } catch (e) {
+        console.error(`Error saving to localStorage for ${name}:`, e);
+        errorMessageDiv.textContent = `Error saving data locally: ${e.message}`;
+        setTimeout(() => errorMessageDiv.textContent = '', 3000);
+    }
 }
 
-function getCookie(name) {
-    const nameEQ = name + "=";
-    const ca = document.cookie.split(';');
-    for(let i = 0; i < ca.length; i++) {
-        let c = ca[i];
-        while (c.charAt(0) === ' ') c = c.substring(1, c.length);
-        if (c.indexOf(nameEQ) === 0) return decodeURIComponent(c.substring(nameEQ.length, c.length));
+function getLocalStorageItem(name) {
+    try {
+        return localStorage.getItem(name);
+    } catch (e) {
+        console.error(`Error loading from localStorage for ${name}:`, e);
+        errorMessageDiv.textContent = `Error loading data locally: ${e.message}`;
+        setTimeout(() => errorMessageDiv.textContent = '', 3000);
+        return null;
     }
-    return null;
 }
 
 // Function to validate and store the API key
@@ -50,22 +62,22 @@ function setApiKey() {
         return false;
     }
     currentApiKey = apiKey;
-    setCookie('geminiApiKey', apiKey, 30); // Save API key to cookie for 30 days
-    errorMessageDiv.textContent = 'API Key set successfully and saved!'; // Indicate success
-    setTimeout(() => errorMessageDiv.textContent = '', 3000); // Clear after 3 seconds
+    setLocalStorageItem('geminiApiKey', apiKey); // Save API key to localStorage
+    errorMessageDiv.textContent = 'API Key set successfully and saved!';
+    setTimeout(() => errorMessageDiv.textContent = '', 3000);
     console.log('API Key set.');
     return true;
 }
 
-// Function to load the API key from cookie
-function loadApiKeyFromCookie() {
-    const apiKey = getCookie('geminiApiKey');
+// Function to load the API key from localStorage
+function loadApiKeyFromLocalStorage() {
+    const apiKey = getLocalStorageItem('geminiApiKey');
     if (apiKey) {
         geminiApiKeyInput.value = apiKey;
         currentApiKey = apiKey;
-        errorMessageDiv.textContent = 'API Key loaded from cookie!';
+        errorMessageDiv.textContent = 'API Key loaded from local storage!';
         setTimeout(() => errorMessageDiv.textContent = '', 3000);
-        console.log('API Key loaded from cookie.');
+        console.log('API Key loaded from local storage.');
     }
 }
 
@@ -74,16 +86,63 @@ function updateSelectedModel() {
     selectedModel = geminiModelSelect.value;
     console.log(`Selected model: ${selectedModel}`);
     errorMessageDiv.textContent = `Model set to: ${selectedModel}`;
-    setTimeout(() => errorMessageDiv.textContent = '', 3000); // Clear after 3 seconds
+    setTimeout(() => errorMessageDiv.textContent = '', 3000);
+}
+
+// Function to save system instruction to localStorage
+function saveSystemInstruction() {
+    systemInstruction = systemInstructionInput.value.trim();
+    setLocalStorageItem('systemInstruction', systemInstruction);
+    console.log('System instruction saved.');
+}
+
+// Function to load system instruction from localStorage
+function loadSystemInstructionFromLocalStorage() {
+    const loadedInstruction = getLocalStorageItem('systemInstruction');
+    if (loadedInstruction) {
+        systemInstruction = loadedInstruction;
+        systemInstructionInput.value = loadedInstruction;
+        console.log('System instruction loaded from local storage.');
+    }
+}
+
+// Function to save chat history to localStorage
+function saveChatHistoryToLocalStorage() {
+    setLocalStorageItem('chatHistory', JSON.stringify(chatHistory));
+    console.log('Chat history saved to local storage.');
+}
+
+// Function to load chat history from localStorage
+function loadChatHistoryFromLocalStorage() {
+    const storedChatHistory = getLocalStorageItem('chatHistory');
+    if (storedChatHistory) {
+        try {
+            const parsedHistory = JSON.parse(storedChatHistory);
+            if (Array.isArray(parsedHistory)) {
+                chatHistory = parsedHistory;
+                console.log('Chat history loaded from local storage.');
+            } else {
+                console.warn('Stored chat history is not an array, initializing empty.');
+                chatHistory = [];
+            }
+        } catch (e) {
+            console.error('Error parsing stored chat history from local storage:', e);
+            chatHistory = []; // Reset on error
+        }
+    }
+    // If no history in localStorage or parsing error, initialize with welcome message
+    if (chatHistory.length === 0) {
+        const initialWelcomeMessageElement = chatHistoryDiv.querySelector('.welcome-message p');
+        if (initialWelcomeMessageElement) {
+            const welcomeText = initialWelcomeMessageElement.textContent.trim();
+            chatHistory.push({ role: 'model', parts: [{ text: welcomeText }] });
+        }
+    }
 }
 
 // Function to update the raw chat history textarea
 function updateRawHistoryInput() {
     if (rawChatHistoryInput) {
-        // Exclude the initial welcome message from the editable raw history,
-        // as it's typically a UI-only element or the first model message.
-        // For simplicity, we'll include all messages in chatHistory for now.
-        // If the initial welcome message from HTML is pushed, it's part of chatHistory.
         try {
             rawChatHistoryInput.value = JSON.stringify(chatHistory, null, 2); // Pretty print JSON
         } catch (e) {
@@ -100,12 +159,12 @@ function applyRawHistory() {
     const rawText = rawChatHistoryInput.value;
     try {
         const parsedHistory = JSON.parse(rawText);
-        // Basic validation: ensure it's an array and each item has 'role' and 'parts'
         if (!Array.isArray(parsedHistory) || !parsedHistory.every(item => item.role && Array.isArray(item.parts))) {
             throw new Error("Invalid chat history format. Expected an array of objects with 'role' and 'parts'.");
         }
         chatHistory = parsedHistory;
         renderChatHistory(); // Re-render chat bubbles based on new history
+        saveChatHistoryToLocalStorage(); // Save updated history
         errorMessageDiv.textContent = 'Chat history applied successfully!';
         setTimeout(() => errorMessageDiv.textContent = '', 3000);
         console.log('Chat history updated from raw input.');
@@ -114,7 +173,6 @@ function applyRawHistory() {
         errorMessageDiv.textContent = `Error applying chat history: ${error.message}`;
     }
 }
-
 
 // Function to render chat history to the UI
 function renderChatHistory() {
@@ -133,7 +191,6 @@ function renderChatHistory() {
     // Scroll to the bottom
     chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
 
-    // Update the raw history input whenever the visual chat history is rendered
     updateRawHistoryInput();
 }
 
@@ -159,6 +216,7 @@ async function sendMessage() {
     // Add user message to history
     chatHistory.push({ role: 'user', parts: [{ text: userMessageText }] });
     renderChatHistory(); // Render the new user message and update raw history input
+    saveChatHistoryToLocalStorage(); // Save updated history
     messageInput.value = ''; // Clear input
     adjustTextareaHeight(); // Reset textarea height
     errorMessageDiv.textContent = 'Thinking...'; // Show thinking indicator
@@ -166,9 +224,21 @@ async function sendMessage() {
     try {
         const API_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`;
 
-        // The API expects `contents` to be the full chat history up to this point
+        // Prepend system instruction if available
+        const conversationContent = [...chatHistory];
+        if (systemInstruction) {
+            // For Gemini models, system instructions are typically handled by inserting an initial user message.
+            // Some models might interpret a user message as system instruction if it's the very first.
+            // A common pattern is user: [system instruction] -> model: [empty/acknowledgement]
+            // For simplicity, we'll just prepend it as a user message.
+            conversationContent.unshift({ role: 'user', parts: [{ text: systemInstruction }] });
+            // If the model expects a paired empty model response to set the context, you might add:
+            // conversationContent.unshift({ role: 'model', parts: [{ text: '' }] });
+        }
+
+
         const requestBody = {
-            contents: chatHistory,
+            contents: conversationContent,
             generationConfig: {
                 maxOutputTokens: 5000,
             },
@@ -209,6 +279,7 @@ async function sendMessage() {
         chatHistory.push({ role: 'model', parts: [{ text: modelResponseText }] });
         errorMessageDiv.textContent = ''; // Clear thinking message
         renderChatHistory(); // Render the new model message and update raw history input
+        saveChatHistoryToLocalStorage(); // Save updated history
 
     } catch (error) {
         console.error('Error sending message:', error);
@@ -217,6 +288,7 @@ async function sendMessage() {
         if (chatHistory.length > 0 && chatHistory[chatHistory.length - 1].role === 'user') {
             chatHistory.pop();
             renderChatHistory(); // Re-render to reflect removal and update raw history input
+            saveChatHistoryToLocalStorage(); // Save updated history
         }
     }
 }
@@ -233,11 +305,78 @@ function adjustTextareaHeight() {
     }
 }
 
+// Function to download chat history as a JSON file
+function downloadChatHistory() {
+    if (chatHistory.length === 0) {
+        errorMessageDiv.textContent = "No chat history to save.";
+        setTimeout(() => errorMessageDiv.textContent = '', 3000);
+        return;
+    }
+    const filename = `gemini_chat_history_${new Date().toISOString().slice(0, 10)}.json`;
+    const jsonStr = JSON.stringify(chatHistory, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    errorMessageDiv.textContent = "Chat history saved to file.";
+    setTimeout(() => errorMessageDiv.textContent = '', 3000);
+}
+
+// Function to handle loading chat history from a file
+function handleChatFileLoad(event) {
+    const file = event.target.files[0];
+    if (!file) {
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const loadedHistory = JSON.parse(e.target.result);
+            if (!Array.isArray(loadedHistory) || !loadedHistory.every(item => item.role && Array.isArray(item.parts))) {
+                throw new Error("Invalid chat history file format. Expected an array of objects with 'role' and 'parts'.");
+            }
+            chatHistory = loadedHistory;
+            renderChatHistory();
+            saveChatHistoryToLocalStorage(); // Save loaded history to local storage
+            errorMessageDiv.textContent = "Chat history loaded from file successfully!";
+        } catch (error) {
+            console.error('Error loading chat history from file:', error);
+            errorMessageDiv.textContent = `Error loading chat history from file: ${error.message}`;
+        } finally {
+            setTimeout(() => errorMessageDiv.textContent = '', 5000);
+            loadChatFileInput.value = ''; // Clear the file input
+        }
+    };
+    reader.onerror = (e) => {
+        console.error('Error reading file:', e);
+        errorMessageDiv.textContent = `Error reading file: ${e.target.error.message}`;
+        setTimeout(() => errorMessageDiv.textContent = '', 5000);
+        loadChatFileInput.value = ''; // Clear the file input
+    };
+    reader.readAsText(file);
+}
+
+
 // Event Listeners
 setApiKeyButton.addEventListener('click', setApiKey);
-geminiModelSelect.addEventListener('change', updateSelectedModel); // Event listener for model selection
+geminiModelSelect.addEventListener('change', updateSelectedModel);
 sendMessageButton.addEventListener('click', sendMessage);
-applyRawHistoryButton.addEventListener('click', applyRawHistory); // Event listener for applying raw history
+applyRawHistoryButton.addEventListener('click', applyRawHistory);
+
+// System Instruction events
+systemInstructionInput.addEventListener('input', saveSystemInstruction);
+
+// Chat Save/Load events
+saveChatButton.addEventListener('click', downloadChatHistory);
+loadChatButton.addEventListener('click', () => loadChatFileInput.click()); // Trigger file input click
+loadChatFileInput.addEventListener('change', handleChatFileLoad);
+
 
 messageInput.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -245,23 +384,14 @@ messageInput.addEventListener('keydown', (event) => {
         sendMessage();
     }
 });
-
 messageInput.addEventListener('input', adjustTextareaHeight);
 
 // Initial setup on page load
 document.addEventListener('DOMContentLoaded', () => {
-    loadApiKeyFromCookie(); // Load API key from cookie
+    loadApiKeyFromLocalStorage(); // Load API key
+    loadSystemInstructionFromLocalStorage(); // Load system instruction
+    loadChatHistoryFromLocalStorage(); // Load chat history (or initialize with welcome)
     
-    // Add the initial welcome message from HTML to the chatHistory array if it's not already there
-    // This ensures it's part of the history when sending to the API.
-    const initialWelcomeMessageElement = chatHistoryDiv.querySelector('.message-bubble.model-message p');
-    if (initialWelcomeMessageElement) {
-        const welcomeText = initialWelcomeMessageElement.textContent.trim();
-        // Check if chatHistory is empty or if the first message is not the welcome text
-        if (chatHistory.length === 0 || (chatHistory.length > 0 && chatHistory[0].parts[0].text !== welcomeText)) {
-             chatHistory.unshift({ role: 'model', parts: [{ text: welcomeText }] }); // Add to the beginning
-        }
-    }
     renderChatHistory(); // Render the initial history (including welcome message) and update raw input
     adjustTextareaHeight(); // Adjust textarea height on page load
 

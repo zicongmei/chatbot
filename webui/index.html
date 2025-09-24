@@ -10,6 +10,32 @@
     <div class="header">Gemini Chatbot</div>
 
     <div class="container">
+
+        
+
+        <div class="chat-history" id="chatHistory">
+            <!-- Initial welcome message -->
+            <!-- <div class="message-bubble model-message welcome-message">
+                <p>Hello! Please enter your Gemini API key and select a model above to start chatting.</p>
+            </div> -->
+        </div>
+
+        <div class="chat-input-area">
+            <textarea id="messageInput" placeholder="Type your message..." rows="1"></textarea>
+            <button id="sendMessageButton">Send</button>
+        </div>
+        
+        <div class="raw-chat-history-section">
+            <label for="rawChatHistoryInput">Raw Chat History (JSON):</label>
+            <textarea id="rawChatHistoryInput" placeholder="Edit chat history as JSON here..."></textarea>
+            <button id="applyRawHistoryButton">Apply Raw History</button>
+        </div>
+
+        <div class="system-instruction-section">
+            <label for="systemInstructionInput">Background / Model Character (System Instruction):</label>
+            <textarea id="systemInstructionInput" placeholder="Define model's persona, context, or instructions here. E.g., 'You are a helpful assistant that provides concise answers.'"></textarea>
+        </div>
+
         <div class="api-key-section">
             <label for="geminiApiKey">Gemini API Key:</label>
             <input type="password" id="geminiApiKey" placeholder="Enter your Gemini API Key">
@@ -25,23 +51,14 @@
             </select>
         </div>
 
-        <div class="chat-history" id="chatHistory">
-            <!-- Initial welcome message -->
-            <div class="message-bubble model-message">
-                <p>Hello! Please enter your Gemini API key and select a model above to start chatting.</p>
-            </div>
-        </div>
-        
-        <div class="raw-chat-history-section">
-            <label for="rawChatHistoryInput">Raw Chat History (JSON):</label>
-            <textarea id="rawChatHistoryInput" placeholder="Edit chat history as JSON here..."></textarea>
-            <button id="applyRawHistoryButton">Apply Raw History</button>
+        <div class="chat-actions-section">
+            <button id="saveChatButton">Save Chat (to file)</button>
+            <input type="file" id="loadChatFileInput" accept=".json" style="display: none;">
+            <button id="loadChatButton">Load Chat (from file)</button>
         </div>
 
-        <div class="chat-input-area">
-            <textarea id="messageInput" placeholder="Type your message..." rows="1"></textarea>
-            <button id="sendMessageButton">Send</button>
-        </div>
+        
+
         <div id="errorMessage" class="error-message"></div>
         <div id="tokenStats" class="token-stats"></div>
     </div>

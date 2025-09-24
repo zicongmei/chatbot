@@ -92,6 +92,58 @@
             padding-right: 30px; /* Make space for the arrow */
         }
 
+        /* New styles for system instruction */
+        .system-instruction-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #fff3e0; /* Light orange */
+        }
+        .system-instruction-section label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #ef6c00; /* Darker orange */
+        }
+        .system-instruction-section textarea {
+            width: calc(100% - 22px); /* Account for padding and border */
+            min-height: 80px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-family: Arial, sans-serif;
+            font-size: 0.9em;
+            resize: vertical;
+        }
+
+        /* New styles for chat action buttons */
+        .chat-actions-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #e0f7fa; /* Light cyan */
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        .chat-actions-section button {
+            padding: 10px 15px;
+            background-color: #00bcd4; /* Cyan */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+            flex-grow: 1;
+            max-width: 150px;
+        }
+        .chat-actions-section button:hover {
+            background-color: #00838f; /* Darker cyan */
+        }
+
 
         .chat-history {
             flex-grow: 1;
