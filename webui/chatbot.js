@@ -160,6 +160,8 @@ function updateRawHistoryInput() {
 function applyRawHistory() {
     if (!rawChatHistoryInput) return;
 
+    chatHistory = []
+
     const rawText = rawChatHistoryInput.value;
     try {
         const parsedData = JSON.parse(rawText);
@@ -183,7 +185,7 @@ function applyRawHistory() {
             throw new Error("Invalid 'chatHistory' format. Expected an array of objects with 'role' and 'parts'.");
         }
         chatHistory = newChatHistory;
-        renderChatHistory(); // Re-render chat bubbles based on new history (implicitly calls updateRawHistoryInput)
+        renderChatHistory(); // Re-render chat bubbles based on new history
         saveChatHistoryToLocalStorage(); // Save updated history to local storage
 
         errorMessageDiv.textContent = 'Chat history and system instruction applied successfully!';
