@@ -7,6 +7,8 @@ let systemInstruction = ''; // New variable for system instruction
 
 let totalInputTokens = 0;
 let totalOutputTokens = 0;
+let currentInputTokens = 0; // New: Tokens for the current request
+let currentOutputTokens = 0; // New: Tokens for the current request
 let lastRemovedWasModelReply = false; // New: To track if last removed entry was a model reply
 
 // Get DOM elements
@@ -27,6 +29,7 @@ const rawChatContent = document.getElementById('rawChatContent'); // New: Raw ch
 
 // New DOM elements for system instruction
 const systemInstructionInput = document.getElementById('systemInstructionInput');
+const clearSystemInstructionButton = document.getElementById('clearSystemInstructionButton'); // New: Clear system instruction button
 
 // New DOM elements for chat save/load
 const saveChatButton = document.getElementById('saveChatButton');
@@ -127,6 +130,22 @@ function loadSystemInstructionFromLocalStorage() {
         systemInstructionInput.value = loadedInstruction;
         console.log('System instruction loaded from local storage.');
     }
+}
+
+// Function to clear system instruction
+function clearSystemInstruction() {
+    if (systemInstructionInput.value.trim() === '') {
+        errorMessageDiv.textContent = "Background instruction is already empty.";
+        setTimeout(() => errorMessageDiv.textContent = '', 3000);
+        return;
+    }
+    if (confirm('Are you sure you want to clear the background / system instruction?')) {
+        systemInstructionInput.value = '';
+        systemInstruction = '';
+        saveSystemInstruction(); // This also updates local storage and raw history
+        errorMessageDiv.textContent = "Background instruction cleared.";
+    }
+    setTimeout(() => errorMessageDiv.textContent = '', 3000);
 }
 
 // Function to save chat history to localStorage
@@ -263,7 +282,10 @@ function renderChatHistory() {
 // Function to render accumulated token stats
 function renderTokenStats() {
     if (tokenStatsDiv) {
-        tokenStatsDiv.textContent = `Input Tokens: ${totalInputTokens} | Output Tokens: ${totalOutputTokens}`;
+        tokenStatsDiv.innerHTML = `
+            <div><strong>Input Tokens:</strong> Current: ${currentInputTokens} | Total: ${totalInputTokens}</div>
+            <div><strong>Output Tokens:</strong> Current: ${currentOutputTokens} | Total: ${totalOutputTokens}</div>
+        `;
     }
 }
 
@@ -275,6 +297,11 @@ async function _sendContentToModel(userMessageTextForAPI, contentToSendForAPI) {
     }
 
     errorMessageDiv.textContent = 'Thinking...'; // Show thinking indicator
+
+    // Reset current request token counts at the start of a new API call attempt
+    currentInputTokens = 0;
+    currentOutputTokens = 0;
+    renderTokenStats(); // Update UI to reflect reset
 
     try {
         const API_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`;
@@ -311,8 +338,11 @@ async function _sendContentToModel(userMessageTextForAPI, contentToSendForAPI) {
 
         // Update token counts
         if (data.usageMetadata) {
-            totalInputTokens += data.usageMetadata.promptTokenCount || 0;
-            totalOutputTokens += data.usageMetadata.candidatesTokenCount || 0;
+            currentInputTokens = data.usageMetadata.promptTokenCount || 0; // Update current request tokens
+            currentOutputTokens = data.usageMetadata.candidatesTokenCount || 0; // Update current request tokens
+
+            totalInputTokens += currentInputTokens;
+            totalOutputTokens += currentOutputTokens;
             renderTokenStats();
             saveTokenStatsToLocalStorage();
         }
@@ -327,6 +357,10 @@ async function _sendContentToModel(userMessageTextForAPI, contentToSendForAPI) {
     } catch (error) {
         console.error('Error sending message:', error);
         errorMessageDiv.textContent = `Error sending message: ${error.message}`;
+        // On error, current tokens should be 0 as the request failed or was incomplete.
+        currentInputTokens = 0;
+        currentOutputTokens = 0;
+        renderTokenStats(); // Update UI to reflect 0 for current
         return false; // Indicate failure
     }
 }
@@ -541,6 +575,8 @@ function clearAllHistory() {
         chatHistory = []; // Clear the array
         totalInputTokens = 0; // Reset tokens
         totalOutputTokens = 0; // Reset tokens
+        currentInputTokens = 0; // Reset current tokens
+        currentOutputTokens = 0; // Reset current tokens
         lastRemovedWasModelReply = false; // Reset regeneration state
         renderChatHistory(); // Re-render (will be empty)
         renderTokenStats(); // Update token display
@@ -562,6 +598,7 @@ debugButton.addEventListener('click', toggleRawChatHistory); // New: Debug butto
 
 // System Instruction events
 systemInstructionInput.addEventListener('input', saveSystemInstruction);
+clearSystemInstructionButton.addEventListener('click', clearSystemInstruction); // New: Clear system instruction button listener
 
 // Chat Save/Load events
 saveChatButton.addEventListener('click', downloadChatHistory);

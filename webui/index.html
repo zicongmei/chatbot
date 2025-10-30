@@ -31,6 +31,7 @@
          <div class="system-instruction-section">
             <label for="systemInstructionInput">Background / Model Character (System Instruction):</label>
             <textarea id="systemInstructionInput" placeholder="Define model's persona, context, or instructions here. E.g., 'You are a helpful assistant that provides concise answers.'"></textarea>
+            <button id="clearSystemInstructionButton">Remove Background Instruction</button>
         </div>
 
 
@@ -59,7 +60,7 @@
 
         <div class="api-key-section">
             <label for="geminiApiKey">Gemini API Key:</label>
-            <input id="geminiApiKey" type="password" placeholder="Enter your Gemini API Key">
+            <input id="geminiApiKey" type="text" placeholder="Enter your Gemini API Key">
             <button id="setApiKeyButton">Set Key</button>
         </div>
 
@@ -72,7 +73,9 @@
             </select>
         </div>
 
-         <div id="tokenStats" class="token-stats"></div>
+         <div id="tokenStats" class="token-stats">
+            <!-- Token stats will be rendered here by JavaScript -->
+         </div>
     </div>
 
     <script src="chatbot.js" defer></script>
