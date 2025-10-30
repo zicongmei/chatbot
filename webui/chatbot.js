@@ -21,6 +21,8 @@ const tokenStatsDiv = document.getElementById('tokenStats');
 // DOM elements for raw chat history
 const rawChatHistoryInput = document.getElementById('rawChatHistoryInput');
 const applyRawHistoryButton = document.getElementById('applyRawHistoryButton');
+const debugButton = document.getElementById('debugButton'); // New: Debug button
+const rawChatContent = document.getElementById('rawChatContent'); // New: Raw chat content div
 
 // New DOM elements for system instruction
 const systemInstructionInput = document.getElementById('systemInstructionInput');
@@ -29,6 +31,10 @@ const systemInstructionInput = document.getElementById('systemInstructionInput')
 const saveChatButton = document.getElementById('saveChatButton');
 const loadChatButton = document.getElementById('loadChatButton');
 const loadChatFileInput = document.getElementById('loadChatFileInput');
+
+// New DOM elements for chat history actions
+const removeLastEntryButton = document.getElementById('removeLastEntryButton'); // New
+const clearAllHistoryButton = document.getElementById('clearAllHistoryButton'); // New
 
 
 // Utility functions for localStorage
@@ -84,9 +90,23 @@ function loadApiKeyFromLocalStorage() {
 // Function to update the selected model
 function updateSelectedModel() {
     selectedModel = geminiModelSelect.value;
+    setLocalStorageItem('selectedModel', selectedModel); // Save selected model to localStorage
     console.log(`Selected model: ${selectedModel}`);
     errorMessageDiv.textContent = `Model set to: ${selectedModel}`;
     setTimeout(() => errorMessageDiv.textContent = '', 3000);
+}
+
+// Function to load the selected model from localStorage
+function loadSelectedModelFromLocalStorage() {
+    const storedModel = getLocalStorageItem('selectedModel');
+    if (storedModel) {
+        selectedModel = storedModel;
+        geminiModelSelect.value = storedModel;
+        console.log(`Selected model loaded from local storage: ${selectedModel}`);
+    } else {
+        // If no model is stored, ensure the dropdown reflects the default
+        geminiModelSelect.value = selectedModel;
+    }
 }
 
 // Function to save system instruction to localStorage
@@ -134,10 +154,31 @@ function loadChatHistoryFromLocalStorage() {
     // If no history in localStorage or parsing error, or history is empty after loading,
     // and there's no system instruction already providing context, add a welcome message.
     if (chatHistory.length === 0 && !systemInstruction) {
-        chatHistory.push({ role: 'model', parts: [{ text: 'Hello! Please enter your Gemini API key and select a model above to start chatting.' }] });
-        console.log('Initialized chat history with a welcome message.');
+        // don't show the welcome message
+        // chatHistory.push({ role: 'model', parts: [{ text: 'Hello! Please enter your Gemini API key and select a model above to start chatting.' }] });
+        // console.log('Initialized chat history with a welcome message.');
         saveChatHistoryToLocalStorage(); // Save this initial state
     }
+}
+
+// Function to save token stats to localStorage
+function saveTokenStatsToLocalStorage() {
+    setLocalStorageItem('totalInputTokens', totalInputTokens.toString());
+    setLocalStorageItem('totalOutputTokens', totalOutputTokens.toString());
+    console.log('Token stats saved to local storage.');
+}
+
+// Function to load token stats from localStorage
+function loadTokenStatsFromLocalStorage() {
+    const storedInput = getLocalStorageItem('totalInputTokens');
+    const storedOutput = getLocalStorageItem('totalOutputTokens');
+    if (storedInput) {
+        totalInputTokens = parseInt(storedInput, 10);
+    }
+    if (storedOutput) {
+        totalOutputTokens = parseInt(storedOutput, 10);
+    }
+    console.log(`Token stats loaded: Input=${totalInputTokens}, Output=${totalOutputTokens}`);
 }
 
 // Function to update the raw chat history textarea
@@ -292,6 +333,7 @@ async function sendMessage() {
             totalInputTokens += data.usageMetadata.promptTokenCount || 0;
             totalOutputTokens += data.usageMetadata.candidatesTokenCount || 0;
             renderTokenStats();
+            saveTokenStatsToLocalStorage(); // Save updated token stats
         }
 
         // Add model response to history
@@ -400,12 +442,62 @@ function handleChatFileLoad(event) {
     reader.readAsText(file);
 }
 
+// Function to toggle raw chat history visibility
+function toggleRawChatHistory() {
+    if (rawChatContent) {
+        const isHidden = rawChatContent.classList.toggle('hidden');
+        setLocalStorageItem('rawChatHistoryHidden', isHidden.toString()); // Save the state
+        console.log('Raw chat history visibility saved:', !isHidden);
+    }
+}
+
+// Function to load raw chat history toggle state from localStorage
+function loadRawChatHistoryToggleStateFromLocalStorage() {
+    const isHidden = getLocalStorageItem('rawChatHistoryHidden');
+    if (isHidden === 'true') {
+        rawChatContent.classList.add('hidden');
+    } else {
+        rawChatContent.classList.remove('hidden'); // Ensure it's shown if 'false' or not set
+    }
+    console.log('Raw chat history visibility loaded:', isHidden === 'true' ? 'hidden' : 'visible');
+}
+
+
+// Function to remove the last entry from chat history
+function removeLastEntry() {
+    if (chatHistory.length > 0) {
+        const lastEntry = chatHistory.pop(); // Remove the last entry
+        renderChatHistory(); // Re-render chat bubbles
+        saveChatHistoryToLocalStorage(); // Save updated history
+        errorMessageDiv.textContent = `Last entry (${lastEntry.role}) removed.`;
+    } else {
+        errorMessageDiv.textContent = 'No chat history to remove.';
+    }
+    setTimeout(() => errorMessageDiv.textContent = '', 3000);
+}
+
+// Function to clear all chat history
+function clearAllHistory() {
+    if (confirm('Are you sure you want to clear all chat history? This cannot be undone.')) {
+        chatHistory = []; // Clear the array
+        totalInputTokens = 0; // Reset tokens
+        totalOutputTokens = 0; // Reset tokens
+        renderChatHistory(); // Re-render (will be empty)
+        renderTokenStats(); // Update token display
+        saveChatHistoryToLocalStorage(); // Save empty history
+        saveTokenStatsToLocalStorage(); // Save reset token stats
+        errorMessageDiv.textContent = 'All chat history cleared.';
+    }
+    setTimeout(() => errorMessageDiv.textContent = '', 3000);
+}
+
 
 // Event Listeners
 setApiKeyButton.addEventListener('click', setApiKey);
 geminiModelSelect.addEventListener('change', updateSelectedModel);
 sendMessageButton.addEventListener('click', sendMessage);
 applyRawHistoryButton.addEventListener('click', applyRawHistory);
+debugButton.addEventListener('click', toggleRawChatHistory); // New: Debug button listener
 
 // System Instruction events
 systemInstructionInput.addEventListener('input', saveSystemInstruction);
@@ -414,6 +506,10 @@ systemInstructionInput.addEventListener('input', saveSystemInstruction);
 saveChatButton.addEventListener('click', downloadChatHistory);
 loadChatButton.addEventListener('click', () => loadChatFileInput.click()); // Trigger file input click
 loadChatFileInput.addEventListener('change', handleChatFileLoad);
+
+// Chat history action events
+removeLastEntryButton.addEventListener('click', removeLastEntry); // New
+clearAllHistoryButton.addEventListener('click', clearAllHistory); // New
 
 
 messageInput.addEventListener('keydown', (event) => {
@@ -428,13 +524,16 @@ messageInput.addEventListener('input', adjustTextareaHeight);
 document.addEventListener('DOMContentLoaded', () => {
     loadApiKeyFromLocalStorage(); // Load API key
     loadSystemInstructionFromLocalStorage(); // Load system instruction
+    loadSelectedModelFromLocalStorage(); // Load selected model
     loadChatHistoryFromLocalStorage(); // Load chat history (or initialize with welcome)
+    loadTokenStatsFromLocalStorage(); // Load token stats
+    loadRawChatHistoryToggleStateFromLocalStorage(); // Load raw chat toggle state
     
     renderChatHistory(); // Render the initial history (including welcome message) and update raw input
     adjustTextareaHeight(); // Adjust textarea height on page load
 
     // Set the initial selected model based on dropdown and update global variable
-    geminiModelSelect.value = selectedModel; // Ensure the dropdown reflects the default
+    // geminiModelSelect.value = selectedModel; // This is now handled by loadSelectedModelFromLocalStorage
     updateSelectedModel(); 
-    renderTokenStats(); // Render initial token stats (should be 0)
+    renderTokenStats(); // Render initial token stats
 });

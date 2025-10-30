@@ -85,7 +85,7 @@
             font-size: 1em;
             min-width: 150px;
             appearance: none; /* Remove default dropdown arrow */
-            background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23007bff%22%20d%3D%22M287%20164.7c-4.6%204.6-10.7%207-16.5%207-5.9%200-11.7-2.3-16.5-7L146.2%2054.6%2042.4%20158.4c-4.8%204.6-10.9%207-16.5%207s-11.7-2.3-16.5-7c-9.1-9.3-9.1-24.1-.2-33.3L130%2010.5c9.2-9.2%2024.1-9.2%2033.3%200L287%20131.4c9.1%209.2%209.1%2024.1-.1%2033.3z%22%2F%3E%3C%2Fsvg%3E'); /* Custom arrow */
+            background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http://www.w3.org/2000/svg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23007bff%22%20d%3D%22M287%20164.7c-4.6%204.6-10.7%207-16.5%207-5.9%200-11.7-2.3-16.5-7L146.2%2054.6%2042.4%20158.4c-4.8%204.6-10.9%207-16.5%207s-11.7-2.3-16.5-7c-9.1-9.3-9.1-24.1-.2-33.3L130%2010.5c9.2-9.2%2024.1-9.2%2033.3%200L287%20131.4c9.1%209.2%209.1%2024.1-.1%2033.3z%22/%3E%3C/svg%3E'); /* Custom arrow */
             background-repeat: no-repeat;
             background-position: right 10px center;
             background-size: 12px;
@@ -125,6 +125,7 @@
             border-radius: 8px;
             background-color: #e0f7fa; /* Light cyan */
             display: flex;
+            flex-wrap: wrap; /* Allow buttons to wrap */
             gap: 10px;
             justify-content: center;
         }
@@ -138,7 +139,7 @@
             font-size: 1em;
             font-weight: bold;
             flex-grow: 1;
-            max-width: 150px;
+            max-width: 180px; /* Adjusted for more buttons */
         }
         .chat-actions-section button:hover {
             background-color: #00838f; /* Darker cyan */
@@ -208,7 +209,26 @@
             resize: vertical; /* Allow vertical resizing */
             margin-bottom: 10px;
         }
-        .raw-chat-history-section button {
+        .raw-chat-history-section .debug-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            justify-content: flex-end; /* Align debug button to the right */
+        }
+        .raw-chat-history-section .debug-controls button {
+            padding: 8px 12px;
+            background-color: #6c757d; /* Grey for debug */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: normal;
+        }
+        .raw-chat-history-section .debug-controls button:hover {
+            background-color: #5a6268;
+        }
+        .raw-chat-history-section button { /* Apply button style for Apply Raw History */
             padding: 10px 15px;
             background-color: #ffc107; /* Warning yellow */
             color: #333;
@@ -217,9 +237,16 @@
             cursor: pointer;
             font-size: 1em;
             font-weight: bold;
+            display: block; /* Make it a block element to take full width */
+            width: 100%;
+            box-sizing: border-box; /* Include padding and border in the element's total width */
         }
         .raw-chat-history-section button:hover {
             background-color: #e0a800; /* Darker yellow */
+        }
+        /* Class to hide elements */
+        .hidden {
+            display: none;
         }
 
 
@@ -254,19 +281,43 @@
         .chat-input-area button:hover {
             background-color: #0056b3;
         }
+
+        /* Status messages moved to top */
         .error-message {
             color: red;
-            margin-top: 5px;
+            margin-bottom: 5px; /* Add space below error */
             text-align: center;
-            height: 20px; /* Reserve space for error message */
+            min-height: 20px;
         }
         .token-stats {
-            margin-top: 10px;
+            margin-bottom: 20px; /* Push content below it down */
             padding: 10px;
             background-color: #f0f0f0;
             border-radius: 5px;
             text-align: center;
             font-size: 0.9em;
             color: #555;
-            min-height: 20px; /* Ensure it takes up space even if empty */
+            min-height: 20px;
+        }
+
+        /* New section for "Remove Last Entry" button */
+        .quick-actions-section {
+            margin-top: -10px; /* Adjust to bring it closer to the input area */
+            margin-bottom: 20px; /* Standard spacing for sections */
+            display: flex;
+            justify-content: flex-end; /* Align to the right */
+        }
+        .quick-actions-section button {
+            padding: 8px 15px;
+            background-color: #dc3545; /* Red for remove/danger */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: bold;
+            margin-right: 10px; /* Align with the margin of the send button */
+        }
+        .quick-actions-section button:hover {
+            background-color: #c82333; /* Darker red */
         }

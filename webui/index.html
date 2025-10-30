@@ -10,9 +10,8 @@
     <div class="header">Gemini Chatbot</div>
 
     <div class="container">
-
-        
-
+        <div id="errorMessage" class="error-message"></div>
+      
         <div class="chat-history" id="chatHistory">
             <!-- Initial welcome message (now added dynamically in JS if history is empty) -->
         </div>
@@ -22,20 +21,45 @@
             <button id="sendMessageButton">Send</button>
         </div>
         
-        <div class="raw-chat-history-section">
-            <label for="rawChatHistoryInput">Raw Chat History (JSON):</label>
-            <textarea id="rawChatHistoryInput" placeholder="Edit chat history as JSON here..."></textarea>
-            <button id="applyRawHistoryButton">Apply Raw History</button>
+        
+        <div class="chat-actions-section">
+            <button id="removeLastEntryButton">Remove Last Entry</button>
         </div>
 
-        <div class="system-instruction-section">
+
+         <div class="system-instruction-section">
             <label for="systemInstructionInput">Background / Model Character (System Instruction):</label>
             <textarea id="systemInstructionInput" placeholder="Define model's persona, context, or instructions here. E.g., 'You are a helpful assistant that provides concise answers.'"></textarea>
         </div>
 
+
+        <div class="chat-actions-section">
+            <button id="saveChatButton">Save Chat (to file)</button>
+            <input type="file" id="loadChatFileInput" accept=".json" style="display: none;">
+            <button id="loadChatButton">Load Chat (from file)</button>
+            <button id="clearAllHistoryButton">Clear All History</button>
+            <button id="removeLastEntryButton">Remove Last Entry</button>
+        </div>
+
+
+       
+        <!-- Debug button for raw chat history -->
+        <div class="raw-chat-history-section">
+            <div class="debug-controls">
+                <button id="debugButton">Toggle Raw Chat (Debug)</button>
+            </div>
+            <div id="rawChatContent" class="hidden"> <!-- Content to be toggled -->
+                <label for="rawChatHistoryInput">Raw Chat History (JSON):</label>
+                <textarea id="rawChatHistoryInput" placeholder="Edit chat history as JSON here..."></textarea>
+                <button id="applyRawHistoryButton">Apply Raw History</button>
+            </div>
+        </div>
+
+         
+
         <div class="api-key-section">
             <label for="geminiApiKey">Gemini API Key:</label>
-            <input type="password" id="geminiApiKey" placeholder="Enter your Gemini API Key">
+            <input id="geminiApiKey" placeholder="Enter your Gemini API Key">
             <button id="setApiKeyButton">Set Key</button>
         </div>
 
@@ -48,16 +72,7 @@
             </select>
         </div>
 
-        <div class="chat-actions-section">
-            <button id="saveChatButton">Save Chat (to file)</button>
-            <input type="file" id="loadChatFileInput" accept=".json" style="display: none;">
-            <button id="loadChatButton">Load Chat (from file)</button>
-        </div>
-
-        
-
-        <div id="errorMessage" class="error-message"></div>
-        <div id="tokenStats" class="token-stats"></div>
+         <div id="tokenStats" class="token-stats"></div>
     </div>
 
     <script src="chatbot.js" defer></script>
