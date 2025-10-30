@@ -24,6 +24,7 @@
         
         <div class="chat-actions-section">
             <button id="removeLastEntryButton">Remove Last Entry</button>
+            <button id="regenerateSystemReplyButton" class="hidden">Re-generate Reply</button>
         </div>
 
 
@@ -38,7 +39,6 @@
             <input type="file" id="loadChatFileInput" accept=".json" style="display: none;">
             <button id="loadChatButton">Load Chat (from file)</button>
             <button id="clearAllHistoryButton">Clear All History</button>
-            <button id="removeLastEntryButton">Remove Last Entry</button>
         </div>
 
 
@@ -59,7 +59,7 @@
 
         <div class="api-key-section">
             <label for="geminiApiKey">Gemini API Key:</label>
-            <input id="geminiApiKey" placeholder="Enter your Gemini API Key">
+            <input id="geminiApiKey" type="password" placeholder="Enter your Gemini API Key">
             <button id="setApiKeyButton">Set Key</button>
         </div>
 

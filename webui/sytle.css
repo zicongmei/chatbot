@@ -85,7 +85,7 @@
             font-size: 1em;
             min-width: 150px;
             appearance: none; /* Remove default dropdown arrow */
-            background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http://www.w3.org/2000/svg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23007bff%22%20d%3D%22M287%20164.7c-4.6%204.6-10.7%207-16.5%207-5.9%200-11.7-2.3-16.5-7L146.2%2054.6%2042.4%20158.4c-4.8%204.6-10.9%207-16.5%207s-11.7-2.3-16.5-7c-9.1-9.3-9.1-24.1-.2-33.3L130%2010.5c9.2-9.2%2024.1-9.2%2033.3%200L287%20131.4c9.1%209.2%209.1%2024.1-.1%2033.3z%22/%3E%3C/svg%3E'); /* Custom arrow */
+            background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http://www.w3.org/2000/svg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23007bff%22%20d%3D%22M287%20164.7c-4.6%204.6-10.7%207-16.5%207-5.9%200-11.7-2.3-16.5-7L146.2%2054.6%2042.4%20158.4c-4.8%204.6-10.9%207-16.5%207s-11.7-2.3-16.5-7c-9.1-9.3-9.1-24.1-.2-33.3L130%2010.5c9.2-9.2%2024.1-9.2%2033.3%200L287%20131.4c9.1%209.2%209.1%2024.1-.1%2033.3z%22/%3E%3Csvg%3E'); /* Custom arrow */
             background-repeat: no-repeat;
             background-position: right 10px center;
             background-size: 12px;
@@ -306,18 +306,27 @@
             margin-bottom: 20px; /* Standard spacing for sections */
             display: flex;
             justify-content: flex-end; /* Align to the right */
+            gap: 10px; /* Add gap between buttons */
         }
-        .quick-actions-section button {
+        .quick-actions-section button { /* General style for buttons in this section */
             padding: 8px 15px;
-            background-color: #dc3545; /* Red for remove/danger */
-            color: white;
             border: none;
             border-radius: 5px;
             cursor: pointer;
             font-size: 0.9em;
             font-weight: bold;
-            margin-right: 10px; /* Align with the margin of the send button */
         }
-        .quick-actions-section button:hover {
+        .quick-actions-section button#removeLastEntryButton { /* Specific style for remove button */
+            background-color: #dc3545; /* Red for remove/danger */
+            color: white;
+        }
+        .quick-actions-section button#removeLastEntryButton:hover {
             background-color: #c82333; /* Darker red */
+        }
+        .quick-actions-section button#regenerateSystemReplyButton { /* Specific style for regenerate button */
+            background-color: #007bff; /* Primary blue */
+            color: white;
+        }
+        .quick-actions-section button#regenerateSystemReplyButton:hover {
+            background-color: #0056b3; /* Darker blue */
         }

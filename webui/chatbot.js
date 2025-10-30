@@ -7,6 +7,7 @@ let systemInstruction = ''; // New variable for system instruction
 
 let totalInputTokens = 0;
 let totalOutputTokens = 0;
+let lastRemovedWasModelReply = false; // New: To track if last removed entry was a model reply
 
 // Get DOM elements
 const geminiApiKeyInput = document.getElementById('geminiApiKey');
@@ -35,6 +36,7 @@ const loadChatFileInput = document.getElementById('loadChatFileInput');
 // New DOM elements for chat history actions
 const removeLastEntryButton = document.getElementById('removeLastEntryButton'); // New
 const clearAllHistoryButton = document.getElementById('clearAllHistoryButton'); // New
+const regenerateSystemReplyButton = document.getElementById('regenerateSystemReplyButton'); // New
 
 
 // Utility functions for localStorage
@@ -265,40 +267,20 @@ function renderTokenStats() {
     }
 }
 
-// Function to send a message directly via HTTP request to Gemini endpoint
-async function sendMessage() {
-    const userMessageText = messageInput.value.trim();
-    if (!userMessageText) {
-        return; // Don't send empty messages
-    }
-
+// Helper function to send content to the Gemini API
+async function _sendContentToModel(userMessageTextForAPI, contentToSendForAPI) {
     if (!currentApiKey) {
         errorMessageDiv.textContent = 'Please set your Gemini API Key first.';
-        return;
+        return false; // Indicate failure
     }
 
-    // Add user message to history
-    chatHistory.push({ role: 'user', parts: [{ text: userMessageText }] });
-    renderChatHistory(); // Render the new user message and update raw history input
-    saveChatHistoryToLocalStorage(); // Save updated history
-    messageInput.value = ''; // Clear input
-    adjustTextareaHeight(); // Reset textarea height
     errorMessageDiv.textContent = 'Thinking...'; // Show thinking indicator
 
     try {
         const API_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`;
 
-        // Prepend system instruction if available for the API call
-        const conversationContent = [...chatHistory];
-        if (systemInstruction) {
-            // For Gemini models, system instructions are typically handled by inserting an initial user message.
-            // This does not modify the persistent chatHistory or displayed raw history.
-            conversationContent.unshift({ role: 'user', parts: [{ text: systemInstruction }] });
-        }
-
-
         const requestBody = {
-            contents: conversationContent,
+            contents: contentToSendForAPI, // This will be the actual history for the API call
             generationConfig: {
                 maxOutputTokens: 5000,
             },
@@ -321,7 +303,6 @@ async function sendMessage() {
 
         const data = await response.json();
         
-        // Extract model's response text from the expected structure
         const modelResponseText = data.candidates && data.candidates.length > 0 &&
                                   data.candidates[0].content && data.candidates[0].content.parts &&
                                   data.candidates[0].content.parts.length > 0
@@ -333,7 +314,7 @@ async function sendMessage() {
             totalInputTokens += data.usageMetadata.promptTokenCount || 0;
             totalOutputTokens += data.usageMetadata.candidatesTokenCount || 0;
             renderTokenStats();
-            saveTokenStatsToLocalStorage(); // Save updated token stats
+            saveTokenStatsToLocalStorage();
         }
 
         // Add model response to history
@@ -341,17 +322,56 @@ async function sendMessage() {
         errorMessageDiv.textContent = ''; // Clear thinking message
         renderChatHistory(); // Render the new model message and update raw history input
         saveChatHistoryToLocalStorage(); // Save updated history
+        return true; // Indicate success
 
     } catch (error) {
         console.error('Error sending message:', error);
         errorMessageDiv.textContent = `Error sending message: ${error.message}`;
-        // If API call fails, remove the last user message from history
+        return false; // Indicate failure
+    }
+}
+
+
+// Function to send a message directly via HTTP request to Gemini endpoint
+async function sendMessage() {
+    const userMessageText = messageInput.value.trim();
+    if (!userMessageText) {
+        return; // Don't send empty messages
+    }
+
+    if (!currentApiKey) {
+        errorMessageDiv.textContent = 'Please set your Gemini API Key first.';
+        return;
+    }
+
+    // Add user message to history
+    chatHistory.push({ role: 'user', parts: [{ text: userMessageText }] });
+    renderChatHistory(); // Render the new user message and update raw history input
+    saveChatHistoryToLocalStorage(); // Save updated history
+    messageInput.value = ''; // Clear input
+    adjustTextareaHeight(); // Reset textarea height
+
+    // Prepare content for API call, including system instruction
+    const conversationContent = [...chatHistory];
+    if (systemInstruction) {
+        // For Gemini models, system instructions are typically handled by inserting an initial user message.
+        // This does not modify the persistent chatHistory or displayed raw history.
+        conversationContent.unshift({ role: 'user', parts: [{ text: systemInstruction }] });
+    }
+
+    const success = await _sendContentToModel(userMessageText, conversationContent);
+
+    if (!success) {
+        // If API call failed, remove the last user message from history
         if (chatHistory.length > 0 && chatHistory[chatHistory.length - 1].role === 'user') {
             chatHistory.pop();
             renderChatHistory(); // Re-render to reflect removal and update raw history input
             saveChatHistoryToLocalStorage(); // Save updated history
         }
     }
+    // After any sendMessage, the regenerate button should be hidden
+    lastRemovedWasModelReply = false;
+    updateRegenerateButtonVisibility();
 }
 
 // Adjust textarea height based on content
@@ -463,18 +483,57 @@ function loadRawChatHistoryToggleStateFromLocalStorage() {
 }
 
 
+// Function to update the visibility of the regenerate button
+function updateRegenerateButtonVisibility() {
+    if (regenerateSystemReplyButton) {
+        // Show the button if the last removed entry was a model reply AND there's a user message to regenerate from
+        if (lastRemovedWasModelReply && chatHistory.length > 0 && chatHistory[chatHistory.length - 1].role === 'user') {
+            regenerateSystemReplyButton.classList.remove('hidden');
+        } else {
+            regenerateSystemReplyButton.classList.add('hidden');
+        }
+    }
+}
+
 // Function to remove the last entry from chat history
 function removeLastEntry() {
     if (chatHistory.length > 0) {
         const lastEntry = chatHistory.pop(); // Remove the last entry
+        lastRemovedWasModelReply = (lastEntry.role === 'model'); // Check if it was a model reply
         renderChatHistory(); // Re-render chat bubbles
         saveChatHistoryToLocalStorage(); // Save updated history
         errorMessageDiv.textContent = `Last entry (${lastEntry.role}) removed.`;
     } else {
         errorMessageDiv.textContent = 'No chat history to remove.';
+        lastRemovedWasModelReply = false; // No entry removed, so no model reply removed
     }
+    updateRegenerateButtonVisibility(); // Update button visibility after removal
     setTimeout(() => errorMessageDiv.textContent = '', 3000);
 }
+
+// Function to regenerate the last system reply
+async function regenerateSystemReply() {
+    if (!lastRemovedWasModelReply || chatHistory.length === 0 || chatHistory[chatHistory.length - 1].role !== 'user') {
+        errorMessageDiv.textContent = 'Cannot regenerate: No previous user message to regenerate from, or last removed was not a model reply.';
+        setTimeout(() => errorMessageDiv.textContent = '', 3000);
+        return;
+    }
+
+    const lastUserMessageText = chatHistory[chatHistory.length - 1].parts[0].text;
+    
+    // Prepare content for API call, including system instruction
+    const conversationContent = [...chatHistory]; // chatHistory already ends with the user message
+    if (systemInstruction) {
+        conversationContent.unshift({ role: 'user', parts: [{ text: systemInstruction }] });
+    }
+
+    await _sendContentToModel(lastUserMessageText, conversationContent);
+
+    lastRemovedWasModelReply = false; // Reset flag after attempting regeneration
+    updateRegenerateButtonVisibility(); // Hide button
+    adjustTextareaHeight(); // Re-adjust
+}
+
 
 // Function to clear all chat history
 function clearAllHistory() {
@@ -482,12 +541,14 @@ function clearAllHistory() {
         chatHistory = []; // Clear the array
         totalInputTokens = 0; // Reset tokens
         totalOutputTokens = 0; // Reset tokens
+        lastRemovedWasModelReply = false; // Reset regeneration state
         renderChatHistory(); // Re-render (will be empty)
         renderTokenStats(); // Update token display
         saveChatHistoryToLocalStorage(); // Save empty history
         saveTokenStatsToLocalStorage(); // Save reset token stats
         errorMessageDiv.textContent = 'All chat history cleared.';
     }
+    updateRegenerateButtonVisibility(); // Hide regenerate button
     setTimeout(() => errorMessageDiv.textContent = '', 3000);
 }
 
@@ -510,6 +571,7 @@ loadChatFileInput.addEventListener('change', handleChatFileLoad);
 // Chat history action events
 removeLastEntryButton.addEventListener('click', removeLastEntry); // New
 clearAllHistoryButton.addEventListener('click', clearAllHistory); // New
+regenerateSystemReplyButton.addEventListener('click', regenerateSystemReply); // New
 
 
 messageInput.addEventListener('keydown', (event) => {
@@ -536,4 +598,5 @@ document.addEventListener('DOMContentLoaded', () => {
     // geminiModelSelect.value = selectedModel; // This is now handled by loadSelectedModelFromLocalStorage
     updateSelectedModel(); 
     renderTokenStats(); // Render initial token stats
+    updateRegenerateButtonVisibility(); // New: Set initial state of regenerate button
 });
