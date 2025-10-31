@@ -3,7 +3,7 @@
 let chatHistory = [];
 let currentApiKey = '';
 let selectedModel = 'gemini-2.5-flash-lite';
-let systemInstruction = ''; // New variable for system instruction
+let systemInstruction = ''; // New variable for system instruction, reflects current input field content
 
 let totalInputTokens = 0;
 let totalOutputTokens = 0;
@@ -125,25 +125,17 @@ function loadSelectedModelFromLocalStorage() {
     }
 }
 
-// Function to save system instruction to localStorage
-function saveSystemInstruction() {
-    systemInstruction = systemInstructionInput.value.trim();
-    setLocalStorageItem('systemInstruction', systemInstruction);
-    console.log('System instruction saved.');
-    updateRawHistoryInput(); // Update raw history display when system instruction changes
-}
-
-// Function to load system instruction from localStorage
+// Function to load system instruction from localStorage (for initial pre-fill)
 function loadSystemInstructionFromLocalStorage() {
     const loadedInstruction = getLocalStorageItem('systemInstruction');
     if (loadedInstruction) {
-        systemInstruction = loadedInstruction;
-        systemInstructionInput.value = loadedInstruction;
+        systemInstruction = loadedInstruction; // Update global variable
+        systemInstructionInput.value = loadedInstruction; // Update UI
         console.log('System instruction loaded from local storage.');
     }
 }
 
-// Function to clear system instruction
+// Function to clear system instruction from UI, variable, and localStorage
 function clearSystemInstruction() {
     if (systemInstructionInput.value.trim() === '') {
         errorMessageDiv.textContent = "Background instruction is already empty.";
@@ -152,8 +144,9 @@ function clearSystemInstruction() {
     }
     if (confirm('Are you sure you want to clear the background / system instruction?')) {
         systemInstructionInput.value = '';
-        systemInstruction = '';
-        saveSystemInstruction(); // This also updates local storage and raw history
+        systemInstruction = ''; // Ensure global variable is also cleared
+        setLocalStorageItem('systemInstruction', ''); // Directly clear from local storage
+        updateRawHistoryInput(); // Update raw history display
         errorMessageDiv.textContent = "Background instruction cleared.";
     }
     setTimeout(() => errorMessageDiv.textContent = '', 3000);
@@ -218,7 +211,7 @@ function updateRawHistoryInput() {
     if (rawChatHistoryInput) {
         try {
             const dataToDisplay = {
-                systemInstruction: systemInstruction,
+                systemInstruction: systemInstruction, // Use the global variable which reflects the input
                 chatHistory: chatHistory
             };
             rawChatHistoryInput.value = JSON.stringify(dataToDisplay, null, 2); // Pretty print JSON
@@ -248,8 +241,8 @@ function applyRawHistory() {
         if (typeof newSystemInstruction !== 'string') {
             throw new Error("Invalid 'systemInstruction' format. Expected a string.");
         }
-        systemInstruction = newSystemInstruction;
-        systemInstructionInput.value = systemInstruction;
+        systemInstruction = newSystemInstruction; // Update global variable
+        systemInstructionInput.value = systemInstruction; // Update UI
         setLocalStorageItem('systemInstruction', systemInstruction); // Save to local storage
 
         // Apply chat history
@@ -278,8 +271,10 @@ function renderChatHistory() {
         messageBubble.classList.add('message-bubble');
         messageBubble.classList.add(msg.role === 'user' ? 'user-message' : 'model-message');
         
+        // Handle multiple parts within a message, joining them
+        const textContent = msg.parts.map(part => part.text).join('\n'); // Join parts with newline
         const paragraph = document.createElement('p');
-        paragraph.textContent = msg.parts[0].text;
+        paragraph.textContent = textContent;
         messageBubble.appendChild(paragraph);
 
         chatHistoryDiv.appendChild(messageBubble);
@@ -325,7 +320,7 @@ async function _sendContentToModel(userMessageTextForAPI, contentToSendForAPI) {
         const API_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`;
 
         const requestBody = {
-            contents: contentToSendForAPI, // This will be the actual history for the API call
+            contents: contentToSendForAPI, // This will be the actual history for the API call, potentially with appended system instruction part
             generationConfig: {
                 maxOutputTokens: 5000,
             },
@@ -404,6 +399,9 @@ async function sendMessage() {
         return;
     }
 
+    // Get current system instruction from the input field (one-shot for this request)
+    const currentSystemInstruction = systemInstructionInput.value.trim();
+
     // Add user message to history
     chatHistory.push({ role: 'user', parts: [{ text: userMessageText }] });
     renderChatHistory(); // Render the new user message and update raw history input
@@ -411,12 +409,16 @@ async function sendMessage() {
     messageInput.value = ''; // Clear input
     adjustTextareaHeight(); // Reset textarea height
 
-    // Prepare content for API call, including system instruction
+    // Prepare content for API call: Start with a copy of the chat history
     const conversationContent = [...chatHistory];
-    if (systemInstruction) {
-        // For Gemini models, system instructions are typically handled by inserting an initial user message.
-        // This does not modify the persistent chatHistory or displayed raw history.
-        conversationContent.unshift({ role: 'user', parts: [{ text: systemInstruction }] });
+
+    // Append system instruction to the parts of the *last user message* in the conversation content for API
+    if (currentSystemInstruction !== '') {
+        const lastMessageIndex = conversationContent.length - 1;
+        // Ensure the last message is a user message before appending
+        if (lastMessageIndex >= 0 && conversationContent[lastMessageIndex].role === 'user') {
+            conversationContent[lastMessageIndex].parts.push({ text: `\nSYSTEM INSTRUCTION: ${currentSystemInstruction}` });
+        }
     }
 
     const success = await _sendContentToModel(userMessageText, conversationContent);
@@ -424,11 +426,25 @@ async function sendMessage() {
     if (!success) {
         // If API call failed, remove the last user message from history
         if (chatHistory.length > 0 && chatHistory[chatHistory.length - 1].role === 'user') {
+            // Note: If system instruction was appended, it was to a copy, not the actual chatHistory entry.
+            // So simply popping removes the user message correctly.
             chatHistory.pop();
             renderChatHistory(); // Re-render to reflect removal and update raw history input
             saveChatHistoryToLocalStorage(); // Save updated history
         }
     }
+
+    // Clean up system instruction: Clear the input field and associated variables/storage
+    // This makes the system instruction a "one-shot" instruction per request.
+    if (currentSystemInstruction !== '') { // Only clear if there was content
+        systemInstructionInput.value = ''; // Clear UI
+        systemInstruction = ''; // Clear global variable
+        setLocalStorageItem('systemInstruction', ''); // Clear from local storage
+        updateRawHistoryInput(); // Update raw history display
+        errorMessageDiv.textContent = "Background instruction applied and cleared.";
+        setTimeout(() => errorMessageDiv.textContent = '', 3000);
+    }
+    
     // After any sendMessage, the regenerate button should be hidden
     lastRemovedWasModelReply = false;
     updateRegenerateButtonVisibility();
@@ -448,14 +464,14 @@ function adjustTextareaHeight() {
 
 // Function to download chat history as a JSON file
 function downloadChatHistory() {
-    if (chatHistory.length === 0 && !systemInstruction) {
+    if (chatHistory.length === 0 && systemInstruction.trim() === '') {
         errorMessageDiv.textContent = "No chat history or system instruction to save.";
         setTimeout(() => errorMessageDiv.textContent = '', 3000);
         return;
     }
 
     const dataToSave = {
-        systemInstruction: systemInstruction,
+        systemInstruction: systemInstruction, // Use the current value of the global variable
         chatHistory: chatHistory
     };
 
@@ -491,9 +507,9 @@ function handleChatFileLoad(event) {
             }
 
             // Update system instruction
-            systemInstruction = loadedData.systemInstruction || '';
-            systemInstructionInput.value = systemInstruction;
-            setLocalStorageItem('systemInstruction', systemInstruction);
+            systemInstruction = loadedData.systemInstruction || ''; // Update global variable
+            systemInstructionInput.value = systemInstruction; // Update UI
+            setLocalStorageItem('systemInstruction', systemInstruction); // Save to local storage
 
             // Update chat history
             const newChatHistory = loadedData.chatHistory;
@@ -590,13 +606,33 @@ async function regenerateSystemReply() {
 
     const lastUserMessageText = chatHistory[chatHistory.length - 1].parts[0].text;
     
+    // Get current system instruction from the input field (one-shot for this request)
+    const currentSystemInstruction = systemInstructionInput.value.trim();
+
     // Prepare content for API call, including system instruction
     const conversationContent = [...chatHistory]; // chatHistory already ends with the user message
-    if (systemInstruction) {
-        conversationContent.unshift({ role: 'user', parts: [{ text: systemInstruction }] });
+
+    // Append system instruction to the parts of the *last user message* in the conversation content for API
+    if (currentSystemInstruction !== '') {
+        const lastMessageIndex = conversationContent.length - 1;
+        // Ensure the last message is a user message before appending
+        if (lastMessageIndex >= 0 && conversationContent[lastMessageIndex].role === 'user') {
+            conversationContent[lastMessageIndex].parts.push({ text: `system content: ${currentSystemInstruction}` });
+        }
     }
 
     await _sendContentToModel(lastUserMessageText, conversationContent);
+
+    // Clean up system instruction if it was used
+    // This makes the system instruction a "one-shot" instruction per request.
+    if (currentSystemInstruction !== '') {
+        systemInstructionInput.value = ''; // Clear UI
+        systemInstruction = ''; // Clear global variable
+        setLocalStorageItem('systemInstruction', ''); // Clear from local storage
+        updateRawHistoryInput(); // Update raw history display
+        errorMessageDiv.textContent = "Background instruction applied and cleared.";
+        setTimeout(() => errorMessageDiv.textContent = '', 3000);
+    }
 
     lastRemovedWasModelReply = false; // Reset flag after attempting regeneration
     updateRegenerateButtonVisibility(); // Hide button
@@ -638,7 +674,11 @@ showApiDebugButton.addEventListener('click', toggleApiDebugDisplay);
 
 
 // System Instruction events
-systemInstructionInput.addEventListener('input', saveSystemInstruction);
+// Keep the global 'systemInstruction' variable in sync with the input field for UI display (e.g., raw history)
+systemInstructionInput.addEventListener('input', () => {
+    systemInstruction = systemInstructionInput.value.trim();
+    updateRawHistoryInput();
+});
 clearSystemInstructionButton.addEventListener('click', clearSystemInstruction); // New: Clear system instruction button listener
 
 // Chat Save/Load events
@@ -663,7 +703,7 @@ messageInput.addEventListener('input', adjustTextareaHeight);
 // Initial setup on page load
 document.addEventListener('DOMContentLoaded', () => {
     loadApiKeyFromLocalStorage(); // Load API key
-    loadSystemInstructionFromLocalStorage(); // Load system instruction
+    loadSystemInstructionFromLocalStorage(); // Load system instruction (pre-fills UI and global variable)
     loadSelectedModelFromLocalStorage(); // Load selected model
     loadChatHistoryFromLocalStorage(); // Load chat history (or initialize with welcome)
     loadTokenStatsFromLocalStorage(); // Load token stats
@@ -673,7 +713,6 @@ document.addEventListener('DOMContentLoaded', () => {
     adjustTextareaHeight(); // Adjust textarea height on page load
 
     // Set the initial selected model based on dropdown and update global variable
-    // geminiModelSelect.value = selectedModel; // This is now handled by loadSelectedModelFromLocalStorage
     updateSelectedModel(); 
     renderTokenStats(); // Render initial token stats
     updateRegenerateButtonVisibility(); // New: Set initial state of regenerate button
