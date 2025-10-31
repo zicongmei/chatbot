@@ -56,7 +56,16 @@
             </div>
         </div>
 
-         
+        <!-- Debug section for raw API request and response -->
+        <div class="api-debug-section">
+            <button id="showApiDebugButton">Show Last API Request/Response</button>
+            <div id="apiDebugContent" class="hidden">
+                <h4>Last API Request Body:</h4>
+                <pre id="apiRequestBody"></pre>
+                <h4>Last API Response:</h4>
+                <pre id="apiResponseBody"></pre>
+            </div>
+        </div>
 
         <div class="api-key-section">
             <label for="geminiApiKey">Gemini API Key:</label>

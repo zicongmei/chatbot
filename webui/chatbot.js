@@ -11,6 +11,11 @@ let currentInputTokens = 0; // New: Tokens for the current request
 let currentOutputTokens = 0; // New: Tokens for the current request
 let lastRemovedWasModelReply = false; // New: To track if last removed entry was a model reply
 
+// New: Variables to store raw API request/response for debugging
+let lastRawRequestBody = null;
+let lastRawResponseData = null;
+
+
 // Get DOM elements
 const geminiApiKeyInput = document.getElementById('geminiApiKey');
 const setApiKeyButton = document.getElementById('setApiKeyButton');
@@ -40,6 +45,12 @@ const loadChatFileInput = document.getElementById('loadChatFileInput');
 const removeLastEntryButton = document.getElementById('removeLastEntryButton'); // New
 const clearAllHistoryButton = document.getElementById('clearAllHistoryButton'); // New
 const regenerateSystemReplyButton = document.getElementById('regenerateSystemReplyButton'); // New
+
+// New DOM elements for API Debugging
+const showApiDebugButton = document.getElementById('showApiDebugButton');
+const apiDebugContent = document.getElementById('apiDebugContent');
+const apiRequestBody = document.getElementById('apiRequestBody');
+const apiResponseBody = document.getElementById('apiResponseBody');
 
 
 // Utility functions for localStorage
@@ -303,6 +314,13 @@ async function _sendContentToModel(userMessageTextForAPI, contentToSendForAPI) {
     currentOutputTokens = 0;
     renderTokenStats(); // Update UI to reflect reset
 
+    // Clear previous raw API debug data before a new request
+    lastRawRequestBody = null;
+    lastRawResponseData = null;
+    apiRequestBody.textContent = 'No API request made yet.';
+    apiResponseBody.textContent = 'No API response received yet.';
+
+
     try {
         const API_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`;
 
@@ -313,22 +331,30 @@ async function _sendContentToModel(userMessageTextForAPI, contentToSendForAPI) {
             },
         };
 
+        // Store the raw request body before sending
+        lastRawRequestBody = JSON.stringify(requestBody, null, 2);
+
+
         const response = await fetch(API_ENDPOINT, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-Goog-Api-Key': currentApiKey,
             },
-            body: JSON.stringify(requestBody),
+            body: lastRawRequestBody, // Use the stored stringified body
         });
 
         if (!response.ok) {
             const errorData = await response.json();
+            // Store the raw error response
+            lastRawResponseData = JSON.stringify(errorData, null, 2);
             const errorMessage = errorData.error ? errorData.error.message : response.statusText;
             throw new Error(`API Error: ${errorMessage} (Status: ${response.status})`);
         }
 
         const data = await response.json();
+        // Store the raw successful response
+        lastRawResponseData = JSON.stringify(data, null, 2);
         
         const modelResponseText = data.candidates && data.candidates.length > 0 &&
                                   data.candidates[0].content && data.candidates[0].content.parts &&
@@ -516,6 +542,15 @@ function loadRawChatHistoryToggleStateFromLocalStorage() {
     console.log('Raw chat history visibility loaded:', isHidden === 'true' ? 'hidden' : 'visible');
 }
 
+// Function to toggle raw API request/response visibility
+function toggleApiDebugDisplay() {
+    if (apiDebugContent.classList.contains('hidden')) { // If it's about to be shown
+        apiRequestBody.textContent = lastRawRequestBody || 'No API request made yet. Send a message to see the request.';
+        apiResponseBody.textContent = lastRawResponseData || 'No API response received yet. Send a message to see the response.';
+    }
+    apiDebugContent.classList.toggle('hidden');
+}
+
 
 // Function to update the visibility of the regenerate button
 function updateRegenerateButtonVisibility() {
@@ -578,6 +613,8 @@ function clearAllHistory() {
         currentInputTokens = 0; // Reset current tokens
         currentOutputTokens = 0; // Reset current tokens
         lastRemovedWasModelReply = false; // Reset regeneration state
+        lastRawRequestBody = null; // Clear raw API debug data
+        lastRawResponseData = null; // Clear raw API debug data
         renderChatHistory(); // Re-render (will be empty)
         renderTokenStats(); // Update token display
         saveChatHistoryToLocalStorage(); // Save empty history
@@ -595,6 +632,10 @@ geminiModelSelect.addEventListener('change', updateSelectedModel);
 sendMessageButton.addEventListener('click', sendMessage);
 applyRawHistoryButton.addEventListener('click', applyRawHistory);
 debugButton.addEventListener('click', toggleRawChatHistory); // New: Debug button listener
+
+// New: API Debug button listener
+showApiDebugButton.addEventListener('click', toggleApiDebugDisplay);
+
 
 // System Instruction events
 systemInstructionInput.addEventListener('input', saveSystemInstruction);
