@@ -177,11 +177,16 @@ function loadChatHistoryFromLocalStorage() {
         }
     }
     // If no history in localStorage or parsing error, or history is empty after loading,
-    // and there's no system instruction already providing context, add a welcome message.
+    // and there's no system instruction already providing context, add the instruction message.
     if (chatHistory.length === 0 && !systemInstruction) {
-        // don't show the welcome message
-        // chatHistory.push({ role: 'model', parts: [{ text: 'Hello! Please enter your Gemini API key and select a model above to start chatting.' }] });
-        // console.log('Initialized chat history with a welcome message.');
+        const initialInstruction = `Your task is to write the messages in this chat/roleplay.
+  Use *asterisks* for actions, and (parentheses) for the internal thought processes of a character.
+  NEVER try to "wrap up" the roleplay. This is a never-ending roleplay.
+  Multi-line messages are not allowed - each individual message must be a single paragraph.
+  Avoid unnecessary and unoriginal repetition of previous messages.
+  Write the next 10 messages - remember to make them interesting, authentic, descriptive, natural, engaging, and creative.`;
+        chatHistory.push({ role: 'model', parts: [{ text: initialInstruction }] });
+        console.log('Initialized chat history with the roleplay instruction.');
         saveChatHistoryToLocalStorage(); // Save this initial state
     }
 }
