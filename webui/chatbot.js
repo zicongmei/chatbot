@@ -184,7 +184,7 @@ function loadChatHistoryFromLocalStorage() {
   NEVER try to "wrap up" the roleplay. This is a never-ending roleplay.
   Multi-line messages are not allowed - each individual message must be a single paragraph.
   Avoid unnecessary and unoriginal repetition of previous messages.
-  Write the next 10 messages - remember to make them interesting, authentic, descriptive, natural, engaging, and creative.
+  Write the next message - remember to make them interesting, authentic, descriptive, natural, engaging, and creative.
   Use the same language as input or previous diaglog`;
         chatHistory.push({ role: 'model', parts: [{ text: initialInstruction }] });
         console.log('Initialized chat history with the roleplay instruction.');
@@ -489,7 +489,7 @@ function downloadChatHistory() {
     const minutes = String(now.getMinutes()).padStart(2, '0');
     const seconds = String(now.getSeconds()).padStart(2, '0');
     const timestamp = `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
-    const filename = `gemini_chat_history_${timestamp}.json`;
+    const filename = `gch_${timestamp}.json`;
     
     const jsonStr = JSON.stringify(dataToSave, null, 2);
     const blob = new Blob([jsonStr], { type: 'application/json' });
