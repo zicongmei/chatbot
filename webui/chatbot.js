@@ -423,7 +423,7 @@ async function sendMessage() {
         const lastMessageIndex = conversationContent.length - 1;
         // Ensure the last message is a user message before appending
         if (lastMessageIndex >= 0 && conversationContent[lastMessageIndex].role === 'user') {
-            conversationContent[lastMessageIndex].parts.push({ text: `\nSYSTEM INSTRUCTION: ${currentSystemInstruction}` });
+            conversationContent[lastMessageIndex].parts.push({ text: `\nSYSTEM CONTEXT: ${currentSystemInstruction}` });
         }
     }
 
