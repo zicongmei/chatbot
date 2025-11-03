@@ -47,13 +47,10 @@ spec:
             /bin/ollama serve &
             
             # Wait for Ollama to start and then pull the qwen:8b model
-            while ! curl -s http://localhost:11434/api/tags; do 
-              echo "Waiting for Ollama service..."
-              sleep 5
-            done
+            sleep 5
             
-            echo "Ollama is ready. Pulling qwen:8b..."
-            ollama pull qwen:8b
+            echo "Ollama is ready. Pulling qwen3:8b..."
+            ollama pull qwen3:8b
             
             # Keep the main service running by waiting on the background process
             wait $!
