@@ -1,0 +1,130 @@
+# 1. Deployment: Ollama Server with qwen:8b and Open WebUI Sidecar
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama-qwen-l4-gpu
+  labels:
+    app: ollama-qwen
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ollama-qwen
+  template:
+    metadata:
+      labels:
+        app: ollama-qwen
+    spec:
+      # Use ONLY the allowed node selectors.
+      # The presence of the "nvidia-l4" accelerator label is sufficient.
+      nodeSelector:
+        cloud.google.com/gke-accelerator: nvidia-l4
+      
+      # GKE applies a taint to GPU nodes. This toleration is required.
+      tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Equal"
+        value: "present"
+        effect: "NoSchedule"
+
+      # Recommended: Use a Persistent Volume to store the downloaded model.
+      volumes:
+      - name: ollama-models
+        persistentVolumeClaim:
+          claimName: ollama-qwen-pvc # Defined below
+
+      containers:
+      # --- Ollama Main Container (Server) ---
+      - name: ollama
+        image: ollama/ollama:latest
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            # Set environment variable to make Ollama listen externally
+            export OLLAMA_HOST=0.0.0.0:11434
+            
+            # Start Ollama service in the background
+            /bin/ollama serve &
+            
+            # Wait for Ollama to start and then pull the qwen:8b model
+            while ! curl -s http://localhost:11434/api/tags; do 
+              echo "Waiting for Ollama service..."
+              sleep 5
+            done
+            
+            echo "Ollama is ready. Pulling qwen:8b..."
+            ollama pull qwen:8b
+            
+            # Keep the main service running by waiting on the background process
+            wait $!
+        
+        ports:
+        - containerPort: 11434
+          name: ollama-api
+        
+        # The key to Autopilot provisioning is requesting the GPU resource.
+        resources:
+          limits:
+            cpu: 4
+            memory: 32Gi
+            nvidia.com/gpu: 1 # This limit and the node selector trigger the L4 node.
+          requests:
+            cpu: 2
+            memory: 16Gi
+
+        volumeMounts:
+        - name: ollama-models
+          mountPath: /root/.ollama
+
+      # --- Open WebUI Sidecar Container (Client) ---
+      - name: webui
+        image: ghcr.io/open-webui/open-webui:main
+        env:
+        - name: OLLAMA_BASE_URL
+          value: http://localhost:11434
+        - name: WEBUI_SECRET_KEY
+          value: "YOUR_SECURE_SECRET_KEY"
+        
+        ports:
+        - containerPort: 8080
+          name: webui-http
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 500m
+            memory: 500Mi
+
+---
+
+## 💾 Persistent Volume Claim (PVC)
+# 2. Persistent Volume Claim for Ollama Models
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollama-qwen-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+
+---
+
+# 3. Service to expose the Open WebUI
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama-webui-external
+spec:
+  type: LoadBalancer
+  selector:
+    app: ollama-qwen
+  ports:
+    # Expose the WebUI container's port
+    - port: 80
+      targetPort: 8080
+      protocol: TCP
+      name: http-webui
