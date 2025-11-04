@@ -128,7 +128,7 @@ metadata:
   name: ollama-pvc
 spec:
   accessModes:
-    - ReadOnlyMany
+    - ReadWriteMany
   resources:
     requests:
       storage: 500Gi
