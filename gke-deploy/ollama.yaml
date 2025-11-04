@@ -1,4 +1,6 @@
-# 1. Deployment: Ollama Server with qwen:8b and Open WebUI Sidecar
+# --- START OF COMPLETE YAML FILE ---
+
+# 1. Deployment: Ollama Server with Open WebUI Sidecar (using Init Container for Certs)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -15,23 +17,44 @@ spec:
       labels:
         app: ollama
     spec:
-      # Use ONLY the allowed node selectors.
-      # The presence of the "nvidia-l4" accelerator label is sufficient.
+      # Node and Tolerations for GKE Autopilot L4 GPU
       nodeSelector:
         cloud.google.com/gke-accelerator: nvidia-l4
-      
-      # GKE applies a taint to GPU nodes. This toleration is required.
       tolerations:
       - key: "nvidia.com/gpu"
         operator: "Equal"
         value: "present"
         effect: "NoSchedule"
 
-      # Recommended: Use a Persistent Volume to store the downloaded model.
       volumes:
+      # Volume 1: Persistent storage for models
       - name: ollama-models
         persistentVolumeClaim:
-          claimName: ollama-pvc # Defined below
+          claimName: ollama-pvc
+      
+      # Volume 2: EmptyDir to share TLS certificates.
+      # This data is transient and will be destroyed with the Pod.
+      - name: tls-certs
+        emptyDir: {}
+
+      # --- INIT CONTAINER (Certificate Generation) ---
+      initContainers:
+      - name: cert-generator
+        image: alpine/openssl:latest # Lightweight image with OpenSSL
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            # Generate a fresh self-signed certificate and private key
+            openssl req -x509 -nodes -days 365 -newkey rsa:4096 \
+              -keyout /certs/tls.key \
+              -out /certs/tls.crt \
+              -subj "/CN=ollama-webui-external"
+            
+            echo "Self-signed certificate and key generated successfully."
+
+        volumeMounts:
+        - name: tls-certs
+          mountPath: /certs # Mounts the emptyDir volume
 
       containers:
       # --- Ollama Main Container (Server) ---
@@ -50,12 +73,11 @@ spec:
         - containerPort: 11434
           name: ollama-api
         
-        # The key to Autopilot provisioning is requesting the GPU resource.
         resources:
           limits:
             cpu: 4
             memory: 32Gi
-            nvidia.com/gpu: 1 # This limit and the node selector trigger the L4 node.
+            nvidia.com/gpu: 1
           requests:
             cpu: 2
             memory: 16Gi
@@ -72,10 +94,18 @@ spec:
           value: http://localhost:11434
         - name: WEBUI_SECRET_KEY
           value: "YOUR_SECURE_SECRET_KEY"
+        # Environment variables to enable HTTPS and point to mounted files
+        - name: SSL
+          value: "true"
+        - name: SSL_CERT_PATH
+          value: "/app/certs/tls.crt"
+        - name: SSL_KEY_PATH
+          value: "/app/certs/tls.key"
         
         ports:
         - containerPort: 8080
-          name: webui-http
+          name: webui-https
+        
         resources:
           limits:
             cpu: 1000m
@@ -83,25 +113,29 @@ spec:
           requests:
             cpu: 500m
             memory: 500Mi
+            
+        # Volume mount for the shared certificates
+        volumeMounts:
+        - name: tls-certs
+          mountPath: /app/certs
 
 ---
 
-## 💾 Persistent Volume Claim (PVC)
-# 2. Persistent Volume Claim for Ollama Models
+# 2. Persistent Volume Claim (PVC) for Ollama Models
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: ollama-pvc
 spec:
   accessModes:
-    - ReadWriteOnce
+    - ReadOnlyMany
   resources:
     requests:
       storage: 500Gi
 
 ---
 
-# 3. Service to expose the Open WebUI
+# 3. Service to expose the Open WebUI via HTTPS (443)
 apiVersion: v1
 kind: Service
 metadata:
@@ -111,8 +145,10 @@ spec:
   selector:
     app: ollama
   ports:
-    # Expose the WebUI container's port
-    - port: 80
+    # Expose the WebUI container's internal port (8080) on external standard HTTPS port (443)
+    - port: 443
       targetPort: 8080
       protocol: TCP
-      name: http-webui
+      name: https-webui
+
+# --- END OF COMPLETE YAML FILE ---

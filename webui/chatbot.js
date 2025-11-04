@@ -9,7 +9,6 @@ let totalInputTokens = 0;
 let totalOutputTokens = 0;
 let currentInputTokens = 0; // New: Tokens for the current request
 let currentOutputTokens = 0; // New: Tokens for the current request
-let lastRemovedWasModelReply = false; // New: To track if last removed entry was a model reply
 
 // New: Variables to store raw API request/response for debugging
 let lastRawRequestBody = null;
@@ -455,10 +454,6 @@ async function sendMessage() {
         errorMessageDiv.textContent = "Background instruction applied and cleared.";
         setTimeout(() => errorMessageDiv.textContent = '', 3000);
     }
-    
-    // After any sendMessage, the regenerate button should be hidden
-    lastRemovedWasModelReply = false;
-    updateRegenerateButtonVisibility();
 }
 
 // Adjust textarea height based on content
@@ -588,74 +583,81 @@ function toggleApiDebugDisplay() {
 }
 
 
-// Function to update the visibility of the regenerate button
-function updateRegenerateButtonVisibility() {
-    if (regenerateSystemReplyButton) {
-        // Show the button if the last removed entry was a model reply AND there's a user message to regenerate from
-        if (lastRemovedWasModelReply && chatHistory.length > 0 && chatHistory[chatHistory.length - 1].role === 'user') {
-            regenerateSystemReplyButton.classList.remove('hidden');
-        } else {
-            regenerateSystemReplyButton.classList.add('hidden');
-        }
-    }
-}
-
 // Function to remove the last entry from chat history
 function removeLastEntry() {
     if (chatHistory.length > 0) {
         const lastEntry = chatHistory.pop(); // Remove the last entry
-        lastRemovedWasModelReply = (lastEntry.role === 'model'); // Check if it was a model reply
         renderChatHistory(); // Re-render chat bubbles
         saveChatHistoryToLocalStorage(); // Save updated history
         errorMessageDiv.textContent = `Last entry (${lastEntry.role}) removed.`;
     } else {
         errorMessageDiv.textContent = 'No chat history to remove.';
-        lastRemovedWasModelReply = false; // No entry removed, so no model reply removed
     }
-    updateRegenerateButtonVisibility(); // Update button visibility after removal
     setTimeout(() => errorMessageDiv.textContent = '', 3000);
 }
 
 // Function to regenerate the last system reply
 async function regenerateSystemReply() {
-    if (!lastRemovedWasModelReply || chatHistory.length === 0 || chatHistory[chatHistory.length - 1].role !== 'user') {
-        errorMessageDiv.textContent = 'Cannot regenerate: No previous user message to regenerate from, or last removed was not a model reply.';
+    if (!currentApiKey) {
+        errorMessageDiv.textContent = 'Please set your Gemini API Key first.';
         setTimeout(() => errorMessageDiv.textContent = '', 3000);
         return;
     }
 
-    const lastUserMessageText = chatHistory[chatHistory.length - 1].parts[0].text;
-    
-    // Get current system instruction from the input field (one-shot for this request)
+    errorMessageDiv.textContent = 'Thinking...';
+
+    // Get and clear system instruction (one-shot for this request)
     const currentSystemInstruction = systemInstructionInput.value.trim();
-
-    // Prepare content for API call, including system instruction
-    const conversationContent = [...chatHistory]; // chatHistory already ends with the user message
-
-    // Append system instruction to the parts of the *last user message* in the conversation content for API
-    if (currentSystemInstruction !== '') {
-        const lastMessageIndex = conversationContent.length - 1;
-        // Ensure the last message is a user message before appending
-        if (lastMessageIndex >= 0 && conversationContent[lastMessageIndex].role === 'user') {
-            conversationContent[lastMessageIndex].parts.push({ text: `SYSTEM CONTEXT: ${currentSystemInstruction}` });
-        }
-    }
-
-    await _sendContentToModel(lastUserMessageText, conversationContent);
-
-    // Clean up system instruction if it was used
-    // This makes the system instruction a "one-shot" instruction per request.
     if (currentSystemInstruction !== '') {
         systemInstructionInput.value = ''; // Clear UI
         systemInstruction = ''; // Clear global variable
         setLocalStorageItem('systemInstruction', ''); // Clear from local storage
         updateRawHistoryInput(); // Update raw history display
         errorMessageDiv.textContent = "Background instruction applied and cleared.";
-        setTimeout(() => errorMessageDiv.textContent = '', 3000);
+        setTimeout(() => errorMessageDiv.textContent = '', 3000); 
     }
 
-    lastRemovedWasModelReply = false; // Reset flag after attempting regeneration
-    updateRegenerateButtonVisibility(); // Hide button
+    // Remove last model reply if it exists in chatHistory (to regenerate it)
+    if (chatHistory.length > 0 && chatHistory[chatHistory.length - 1].role === 'model') {
+        chatHistory.pop(); // Remove the last model reply
+        renderChatHistory(); // Update UI
+        saveChatHistoryToLocalStorage(); // Save updated history
+    }
+
+    // Prepare content for API call
+    let contentToSendForAPI = [...chatHistory]; // Start with current history (which now ends in user message or is empty)
+
+    let userPromptForAPI = '';
+    // If there's a user message, capture its text for potential use in case of an empty chatHistory scenario.
+    if (contentToSendForAPI.length > 0 && contentToSendForAPI[contentToSendForAPI.length - 1].role === 'user') {
+        userPromptForAPI = contentToSendForAPI[contentToSendForAPI.length - 1].parts.map(part => part.text).join('\n');
+    }
+
+    // If chatHistory is empty AND there's a system instruction, or just an empty user prompt we want to regenerate from:
+    // We need to add a dummy user message to `contentToSendForAPI` to start the conversation structure for the API.
+    // This handles regenerating from only a system instruction when chat is empty.
+    if (contentToSendForAPI.length === 0 && (currentSystemInstruction || userPromptForAPI.trim() !== '')) {
+         // Create a temporary user message for the API call only. This isn't added to global chatHistory.
+        contentToSendForAPI.push({ role: 'user', parts: [{ text: userPromptForAPI || '' }] });
+    }
+
+    // Append system instruction to the last user message in the *API content*
+    if (currentSystemInstruction !== '') {
+        const lastIndex = contentToSendForAPI.length - 1;
+        if (lastIndex >= 0 && contentToSendForAPI[lastIndex].role === 'user') {
+            contentToSendForAPI[lastIndex].parts.push({ text: `\nSYSTEM CONTEXT: ${currentSystemInstruction}` });
+        }
+    }
+
+    // Final check: If after all preparations, contentToSendForAPI is still empty, there's nothing to generate from.
+    if (contentToSendForAPI.length === 0) {
+        errorMessageDiv.textContent = 'No message or instruction to generate a reply from.';
+        setTimeout(() => errorMessageDiv.textContent = '', 3000);
+        return;
+    }
+
+    // Send content to model
+    await _sendContentToModel(userPromptForAPI, contentToSendForAPI);
     adjustTextareaHeight(); // Re-adjust
 }
 
@@ -668,7 +670,6 @@ function clearAllHistory() {
         totalOutputTokens = 0; // Reset tokens
         currentInputTokens = 0; // Reset current tokens
         currentOutputTokens = 0; // Reset current tokens
-        lastRemovedWasModelReply = false; // Reset regeneration state
         lastRawRequestBody = null; // Clear raw API debug data
         lastRawResponseData = null; // Clear raw API debug data
         renderChatHistory(); // Re-render (will be empty)
@@ -677,7 +678,6 @@ function clearAllHistory() {
         saveTokenStatsToLocalStorage(); // Save reset token stats
         errorMessageDiv.textContent = 'All chat history cleared.';
     }
-    updateRegenerateButtonVisibility(); // Hide regenerate button
     setTimeout(() => errorMessageDiv.textContent = '', 3000);
 }
 
@@ -735,5 +735,4 @@ document.addEventListener('DOMContentLoaded', () => {
     // Set the initial selected model based on dropdown and update global variable
     updateSelectedModel(); 
     renderTokenStats(); // Render initial token stats
-    updateRegenerateButtonVisibility(); // New: Set initial state of regenerate button
 });
