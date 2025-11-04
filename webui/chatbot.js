@@ -399,8 +399,13 @@ async function _sendContentToModel(userMessageTextForAPI, contentToSendForAPI) {
 // Function to send a message directly via HTTP request to Gemini endpoint
 async function sendMessage() {
     const userMessageText = messageInput.value.trim();
-    if (!userMessageText) {
-        return; // Don't send empty messages
+    const currentSystemInstruction = systemInstructionInput.value.trim();
+
+    // Allow sending an empty user message if there's a system instruction
+    if (!userMessageText && !currentSystemInstruction) {
+        errorMessageDiv.textContent = 'Please type a message or provide a background instruction.';
+        setTimeout(() => errorMessageDiv.textContent = '', 3000);
+        return;
     }
 
     if (!currentApiKey) {
@@ -408,11 +413,8 @@ async function sendMessage() {
         return;
     }
 
-    // Get current system instruction from the input field (one-shot for this request)
-    const currentSystemInstruction = systemInstructionInput.value.trim();
-
-    // Add user message to history
-    chatHistory.push({ role: 'user', parts: [{ text: userMessageText }] });
+    // Add user message to history. If userMessageText is empty, push an empty string.
+    chatHistory.push({ role: 'user', parts: [{ text: userMessageText || '' }] });
     renderChatHistory(); // Render the new user message and update raw history input
     saveChatHistoryToLocalStorage(); // Save updated history
     messageInput.value = ''; // Clear input
@@ -635,7 +637,7 @@ async function regenerateSystemReply() {
         const lastMessageIndex = conversationContent.length - 1;
         // Ensure the last message is a user message before appending
         if (lastMessageIndex >= 0 && conversationContent[lastMessageIndex].role === 'user') {
-            conversationContent[lastMessageIndex].parts.push({ text: `system content: ${currentSystemInstruction}` });
+            conversationContent[lastMessageIndex].parts.push({ text: `SYSTEM CONTEXT: ${currentSystemInstruction}` });
         }
     }
 
