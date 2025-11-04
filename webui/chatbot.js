@@ -329,6 +329,9 @@ async function _sendContentToModel(userMessageTextForAPI, contentToSendForAPI) {
             contents: contentToSendForAPI, // This will be the actual history for the API call, potentially with appended system instruction part
             generationConfig: {
                 maxOutputTokens: 5000,
+                thinkingConfig: {
+                    thinkingBudget: -1
+                }
             },
         };
 
