@@ -2,18 +2,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ollama-qwen-l4-gpu
+  name: ollama-l4-gpu
   labels:
-    app: ollama-qwen
+    app: ollama
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: ollama-qwen
+      app: ollama
   template:
     metadata:
       labels:
-        app: ollama-qwen
+        app: ollama
     spec:
       # Use ONLY the allowed node selectors.
       # The presence of the "nvidia-l4" accelerator label is sufficient.
@@ -31,7 +31,7 @@ spec:
       volumes:
       - name: ollama-models
         persistentVolumeClaim:
-          claimName: ollama-qwen-pvc # Defined below
+          claimName: ollama-pvc # Defined below
 
       containers:
       # --- Ollama Main Container (Server) ---
@@ -43,17 +43,8 @@ spec:
             # Set environment variable to make Ollama listen externally
             export OLLAMA_HOST=0.0.0.0:11434
             
-            # Start Ollama service in the background
-            /bin/ollama serve &
-            
-            # Wait for Ollama to start and then pull the qwen:8b model
-            sleep 5
-            
-            echo "Ollama is ready. Pulling qwen3:8b..."
-            ollama pull qwen3:8b
-            
-            # Keep the main service running by waiting on the background process
-            wait $!
+            # Start Ollama service
+            /bin/ollama serve
         
         ports:
         - containerPort: 11434
@@ -100,13 +91,13 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: ollama-qwen-pvc
+  name: ollama-pvc
 spec:
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 100Gi
+      storage: 500Gi
 
 ---
 
@@ -118,7 +109,7 @@ metadata:
 spec:
   type: LoadBalancer
   selector:
-    app: ollama-qwen
+    app: ollama
   ports:
     # Expose the WebUI container's port
     - port: 80
