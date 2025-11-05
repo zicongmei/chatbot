@@ -1,6 +1,51 @@
-# --- START OF COMPLETE YAML FILE ---
+# 0. ConfigMap for Nginx Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config-ollama-l4
+data:
+  nginx.conf: |
+    # Basic Nginx configuration to serve a single HTTPS service
+    events {
+      worker_connections 1024;
+    }
+    http {
+      # This upstream block points to the Open WebUI container via loopback
+      upstream webui_backend {
+          # Use 127.0.0.1 (loopback) to communicate with the WebUI sidecar
+          server 127.0.0.1:8080; 
+      }
+      
+      server {
+        # Listen on 8443 inside the Pod (Nginx sidecar)
+        listen 8443 ssl; 
+        
+        # Paths to the shared certificates mounted from the tls-certs volume
+        ssl_certificate /etc/nginx/certs/tls.crt;
+        ssl_certificate_key /etc/nginx/certs/tls.key;
 
-# 1. Deployment: Ollama Server with Open WebUI Sidecar (using Init Container for Certs)
+        # Standard SSL configuration for security
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers HIGH:!aNULL:!MD5;
+        
+        # Proxy all traffic to the upstream WebUI container
+        location / {
+          proxy_pass http://webui_backend;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+          
+          # Required for WebSocket connections used by the WebUI
+          proxy_http_version 1.1;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection "upgrade";
+        }
+      }
+    }
+---
+
+# 1. Deployment: Ollama Server with Open WebUI and Nginx Sidecars
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -17,7 +62,7 @@ spec:
       labels:
         app: ollama-l4
     spec:
-      # Node and Tolerations for GKE Autopilot L4 GPU
+      # Node and Tolerations for GKE Autopilot l4 GPU
       nodeSelector:
         cloud.google.com/gke-accelerator: nvidia-l4
       tolerations:
@@ -33,14 +78,21 @@ spec:
           claimName: ollama-l4-pvc
       
       # Volume 2: EmptyDir to share TLS certificates.
-      # This data is transient and will be destroyed with the Pod.
       - name: tls-certs
         emptyDir: {}
+        
+      # Volume 3: ConfigMap mount for Nginx configuration file
+      - name: nginx-config-volume
+        configMap:
+          name: nginx-config-ollama-l4
+          items:
+          - key: nginx.conf
+            path: nginx.conf
 
       # --- INIT CONTAINER (Certificate Generation) ---
       initContainers:
       - name: cert-generator
-        image: alpine/openssl:latest # Lightweight image with OpenSSL
+        image: alpine/openssl:latest
         command: ["/bin/sh", "-c"]
         args:
           - |
@@ -52,9 +104,17 @@ spec:
             
             echo "Self-signed certificate and key generated successfully."
 
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 500m
+            memory: 500Mi
+            
         volumeMounts:
         - name: tls-certs
-          mountPath: /certs # Mounts the emptyDir volume
+          mountPath: /certs
 
       containers:
       # --- Ollama Main Container (Server) ---
@@ -86,7 +146,7 @@ spec:
         - name: ollama-models
           mountPath: /root/.ollama
 
-      # --- Open WebUI Sidecar Container (Client) ---
+      # --- Open WebUI Sidecar Container (Client) (HTTP ONLY) ---
       - name: webui
         image: ghcr.io/open-webui/open-webui:main
         env:
@@ -94,17 +154,10 @@ spec:
           value: http://localhost:11434
         - name: WEBUI_SECRET_KEY
           value: "YOUR_SECURE_SECRET_KEY"
-        # Environment variables to enable HTTPS and point to mounted files
-        - name: SSL
-          value: "true"
-        - name: SSL_CERT_PATH
-          value: "/app/certs/tls.crt"
-        - name: SSL_KEY_PATH
-          value: "/app/certs/tls.key"
         
         ports:
         - containerPort: 8080
-          name: webui-https
+          name: webui-http
         
         resources:
           limits:
@@ -113,29 +166,67 @@ spec:
           requests:
             cpu: 500m
             memory: 500Mi
-            
-        # Volume mount for the shared certificates
-        volumeMounts:
-        - name: tls-certs
-          mountPath: /app/certs
 
+      # --- NGINX Sidecar Container (HTTPS Termination) - MODIFIED WITH WAIT ---
+      - name: nginx-sidecar
+        image: nginx:stable-alpine
+        # Use sh -c to run a shell script that waits for WebUI before starting Nginx
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            # Install netcat for the health check/wait loop
+            apk add --no-cache netcat-openbsd
+            
+            # Wait for the Open WebUI container to start listening on 8080
+            echo "Waiting for Open WebUI on 127.0.0.1:8080..."
+            while ! nc -z 127.0.0.1 8080; do
+              sleep 1;
+            done
+            echo "Open WebUI is ready. Starting Nginx."
+            
+            # Execute the Nginx command to start the server
+            exec nginx -g 'daemon off;'
+            
+        ports:
+        - containerPort: 8443
+          name: nginx-https
+        
+        resources:
+          limits:
+            cpu: 200m
+            memory: 128Mi
+          requests:
+            cpu: 100m
+            memory: 64Mi
+
+        volumeMounts:
+        # Mount the shared certificates for Nginx to use
+        - name: tls-certs
+          mountPath: /etc/nginx/certs
+          readOnly: true
+        # Mount the custom Nginx configuration file
+        - name: nginx-config-volume
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf # Mounts only the specific file
+          readOnly: true
+        
 ---
 
-# 2. Persistent Volume Claim (PVC) for Ollama Models
+# 2. Persistent Volume Claim (PVC) for Ollama Models - NO CHANGE
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: ollama-l4-pvc
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   resources:
     requests:
       storage: 300Gi
 
 ---
 
-# 3. Service to expose the Open WebUI via HTTPS (443)
+# 3. Service to expose the Open WebUI via HTTP (80) and HTTPS (443) - MODIFIED
 apiVersion: v1
 kind: Service
 metadata:
@@ -145,10 +236,15 @@ spec:
   selector:
     app: ollama-l4
   ports:
-    # Expose the WebUI container's internal port (8080) on external standard HTTPS port (443)
-    - port: 443
+    # Port 1: Standard HTTP (80)
+    # Traffic -> Service:80 -> WebUI container:8080 (HTTP)
+    - port: 80
       targetPort: 8080
       protocol: TCP
-      name: https-webui
-
-# --- END OF COMPLETE YAML FILE ---
+      name: http-webui
+    # Port 2: Standard HTTPS (443)
+    # Traffic -> Service:443 -> Nginx sidecar:8443 (HTTPS)
+    - port: 443
+      targetPort: 8443
+      protocol: TCP
+      name: https-nginx
