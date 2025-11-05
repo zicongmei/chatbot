@@ -219,7 +219,7 @@ metadata:
   name: ollama-t4-pvc
 spec:
   accessModes:
-    - ReadWriteOnce
+    - ReadWriteMany
   resources:
     requests:
       storage: 300Gi
