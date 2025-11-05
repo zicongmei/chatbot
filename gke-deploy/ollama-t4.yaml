@@ -4,22 +4,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ollama-l4-gpu
+  name: ollama-t4-gpu
   labels:
-    app: ollama
+    app: ollama-t4
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: ollama
+      app: ollama-t4
   template:
     metadata:
       labels:
-        app: ollama
+        app: ollama-t4
     spec:
-      # Node and Tolerations for GKE Autopilot L4 GPU
+      # Node and Tolerations for GKE Autopilot T4 GPU
       nodeSelector:
-        cloud.google.com/gke-accelerator: nvidia-l4
+        cloud.google.com/gke-accelerator: nvidia-tesla-t4
       tolerations:
       - key: "nvidia.com/gpu"
         operator: "Equal"
@@ -30,7 +30,7 @@ spec:
       # Volume 1: Persistent storage for models
       - name: ollama-models
         persistentVolumeClaim:
-          claimName: ollama-pvc
+          claimName: ollama-t4-pvc
       
       # Volume 2: EmptyDir to share TLS certificates.
       # This data is transient and will be destroyed with the Pod.
@@ -52,6 +52,14 @@ spec:
             
             echo "Self-signed certificate and key generated successfully."
 
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 500m
+            memory: 500Mi
+            
         volumeMounts:
         - name: tls-certs
           mountPath: /certs # Mounts the emptyDir volume
@@ -125,13 +133,13 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: ollama-pvc
+  name: ollama-t4-pvc
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   resources:
     requests:
-      storage: 500Gi
+      storage: 300Gi
 
 ---
 
@@ -139,11 +147,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: ollama-webui-external
+  name: ollama-webui-external-t4
 spec:
   type: LoadBalancer
   selector:
-    app: ollama
+    app: ollama-t4
   ports:
     # Expose the WebUI container's internal port (8080) on external standard HTTPS port (443)
     - port: 443

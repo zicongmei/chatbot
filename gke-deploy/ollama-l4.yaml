@@ -1,0 +1,154 @@
+# --- START OF COMPLETE YAML FILE ---
+
+# 1. Deployment: Ollama Server with Open WebUI Sidecar (using Init Container for Certs)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama-l4-gpu
+  labels:
+    app: ollama-l4
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ollama-l4
+  template:
+    metadata:
+      labels:
+        app: ollama-l4
+    spec:
+      # Node and Tolerations for GKE Autopilot L4 GPU
+      nodeSelector:
+        cloud.google.com/gke-accelerator: nvidia-l4
+      tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Equal"
+        value: "present"
+        effect: "NoSchedule"
+
+      volumes:
+      # Volume 1: Persistent storage for models
+      - name: ollama-models
+        persistentVolumeClaim:
+          claimName: ollama-l4-pvc
+      
+      # Volume 2: EmptyDir to share TLS certificates.
+      # This data is transient and will be destroyed with the Pod.
+      - name: tls-certs
+        emptyDir: {}
+
+      # --- INIT CONTAINER (Certificate Generation) ---
+      initContainers:
+      - name: cert-generator
+        image: alpine/openssl:latest # Lightweight image with OpenSSL
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            # Generate a fresh self-signed certificate and private key
+            openssl req -x509 -nodes -days 365 -newkey rsa:4096 \
+              -keyout /certs/tls.key \
+              -out /certs/tls.crt \
+              -subj "/CN=ollama-webui-external"
+            
+            echo "Self-signed certificate and key generated successfully."
+
+        volumeMounts:
+        - name: tls-certs
+          mountPath: /certs # Mounts the emptyDir volume
+
+      containers:
+      # --- Ollama Main Container (Server) ---
+      - name: ollama
+        image: ollama/ollama:latest
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            # Set environment variable to make Ollama listen externally
+            export OLLAMA_HOST=0.0.0.0:11434
+            
+            # Start Ollama service
+            /bin/ollama serve
+        
+        ports:
+        - containerPort: 11434
+          name: ollama-api
+        
+        resources:
+          limits:
+            cpu: 4
+            memory: 32Gi
+            nvidia.com/gpu: 1
+          requests:
+            cpu: 2
+            memory: 16Gi
+
+        volumeMounts:
+        - name: ollama-models
+          mountPath: /root/.ollama
+
+      # --- Open WebUI Sidecar Container (Client) ---
+      - name: webui
+        image: ghcr.io/open-webui/open-webui:main
+        env:
+        - name: OLLAMA_BASE_URL
+          value: http://localhost:11434
+        - name: WEBUI_SECRET_KEY
+          value: "YOUR_SECURE_SECRET_KEY"
+        # Environment variables to enable HTTPS and point to mounted files
+        - name: SSL
+          value: "true"
+        - name: SSL_CERT_PATH
+          value: "/app/certs/tls.crt"
+        - name: SSL_KEY_PATH
+          value: "/app/certs/tls.key"
+        
+        ports:
+        - containerPort: 8080
+          name: webui-https
+        
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 500m
+            memory: 500Mi
+            
+        # Volume mount for the shared certificates
+        volumeMounts:
+        - name: tls-certs
+          mountPath: /app/certs
+
+---
+
+# 2. Persistent Volume Claim (PVC) for Ollama Models
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollama-l4-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 300Gi
+
+---
+
+# 3. Service to expose the Open WebUI via HTTPS (443)
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama-webui-external-l4
+spec:
+  type: LoadBalancer
+  selector:
+    app: ollama-l4
+  ports:
+    # Expose the WebUI container's internal port (8080) on external standard HTTPS port (443)
+    - port: 443
+      targetPort: 8080
+      protocol: TCP
+      name: https-webui
+
+# --- END OF COMPLETE YAML FILE ---
