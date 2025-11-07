@@ -10,6 +10,15 @@ let totalOutputTokens = 0;
 let currentInputTokens = 0; // New: Tokens for the current request
 let currentOutputTokens = 0; // New: Tokens for the current request
 
+// New: Variables for cost calculation
+const MODEL_PRICES = {
+    'gemini-2.5-flash': { input: 0.30 / 1_000_000, output: 2.50 / 1_000_000 },
+    'gemini-2.5-pro': { input: 1.25 / 1_000_000, output: 10.00 / 1_000_000 },
+    'gemini-2.5-flash-lite': { input: 0.10 / 1_000_000, output: 0.40 / 1_000_000 }
+};
+let currentRequestCost = 0; // Cost of the last API call
+let totalCost = 0; // Cumulative cost of all API calls
+
 // New: Variables to store raw API request/response for debugging
 let lastRawRequestBody = null;
 let lastRawResponseData = null;
@@ -24,6 +33,7 @@ const messageInput = document.getElementById('messageInput');
 const sendMessageButton = document.getElementById('sendMessageButton');
 const errorMessageDiv = document.getElementById('errorMessage');
 const tokenStatsDiv = document.getElementById('tokenStats');
+const costStatsDiv = document.getElementById('costStats'); // New: Cost stats div
 
 // DOM elements for raw chat history
 const rawChatHistoryInput = document.getElementById('rawChatHistoryInput');
@@ -191,24 +201,30 @@ function loadChatHistoryFromLocalStorage() {
     }
 }
 
-// Function to save token stats to localStorage
-function saveTokenStatsToLocalStorage() {
+// Function to save token and cost stats to localStorage
+function saveStatsToLocalStorage() {
     setLocalStorageItem('totalInputTokens', totalInputTokens.toString());
     setLocalStorageItem('totalOutputTokens', totalOutputTokens.toString());
-    console.log('Token stats saved to local storage.');
+    setLocalStorageItem('totalCost', totalCost.toString()); // Save total cost
+    console.log('Token and cost stats saved to local storage.');
 }
 
-// Function to load token stats from localStorage
-function loadTokenStatsFromLocalStorage() {
+// Function to load token and cost stats from localStorage
+function loadStatsFromLocalStorage() {
     const storedInput = getLocalStorageItem('totalInputTokens');
     const storedOutput = getLocalStorageItem('totalOutputTokens');
+    const storedTotalCost = getLocalStorageItem('totalCost');
+
     if (storedInput) {
         totalInputTokens = parseInt(storedInput, 10);
     }
     if (storedOutput) {
         totalOutputTokens = parseInt(storedOutput, 10);
     }
-    console.log(`Token stats loaded: Input=${totalInputTokens}, Output=${totalOutputTokens}`);
+    if (storedTotalCost) {
+        totalCost = parseFloat(storedTotalCost);
+    }
+    console.log(`Stats loaded: Input=${totalInputTokens}, Output=${totalOutputTokens}, TotalCost=$${totalCost.toFixed(5)}`);
 }
 
 // Function to update the raw chat history textarea
@@ -300,6 +316,16 @@ function renderTokenStats() {
     }
 }
 
+// Function to render cost stats
+function renderCostStats() {
+    if (costStatsDiv) {
+        costStatsDiv.innerHTML = `
+            <div><strong>Last Request Cost:</strong> $${currentRequestCost.toFixed(5)}</div>
+            <div><strong>Total Cost:</strong> $${totalCost.toFixed(5)}</div>
+        `;
+    }
+}
+
 // Helper function to send content to the Gemini API
 async function _sendContentToModel(userMessageTextForAPI, contentToSendForAPI) {
     if (!currentApiKey) {
@@ -309,10 +335,12 @@ async function _sendContentToModel(userMessageTextForAPI, contentToSendForAPI) {
 
     errorMessageDiv.textContent = 'Thinking...'; // Show thinking indicator
 
-    // Reset current request token counts at the start of a new API call attempt
+    // Reset current request token counts and cost at the start of a new API call attempt
     currentInputTokens = 0;
     currentOutputTokens = 0;
+    currentRequestCost = 0;
     renderTokenStats(); // Update UI to reflect reset
+    renderCostStats(); // Update UI to reflect reset
 
     // Clear previous raw API debug data before a new request
     lastRawRequestBody = null;
@@ -365,15 +393,26 @@ async function _sendContentToModel(userMessageTextForAPI, contentToSendForAPI) {
                                   ? data.candidates[0].content.parts[0].text
                                   : 'No response from model.';
 
-        // Update token counts
+        // Update token counts and calculate cost
         if (data.usageMetadata) {
             currentInputTokens = data.usageMetadata.promptTokenCount || 0; // Update current request tokens
             currentOutputTokens = data.usageMetadata.candidatesTokenCount || 0; // Update current request tokens
 
             totalInputTokens += currentInputTokens;
             totalOutputTokens += currentOutputTokens;
+            
+            // Calculate cost for the current request
+            const prices = MODEL_PRICES[selectedModel];
+            if (prices) {
+                currentRequestCost = (currentInputTokens * prices.input) + (currentOutputTokens * prices.output);
+                totalCost += currentRequestCost;
+            } else {
+                console.warn(`No price information found for model: ${selectedModel}`);
+            }
+
             renderTokenStats();
-            saveTokenStatsToLocalStorage();
+            renderCostStats(); // Call renderCostStats
+            saveStatsToLocalStorage(); // Save updated tokens and cost
         }
 
         // Add model response to history
@@ -386,10 +425,12 @@ async function _sendContentToModel(userMessageTextForAPI, contentToSendForAPI) {
     } catch (error) {
         console.error('Error sending message:', error);
         errorMessageDiv.textContent = `Error sending message: ${error.message}`;
-        // On error, current tokens should be 0 as the request failed or was incomplete.
+        // On error, current tokens and cost should be 0 as the request failed or was incomplete.
         currentInputTokens = 0;
         currentOutputTokens = 0;
+        currentRequestCost = 0; // Reset current request cost on error
         renderTokenStats(); // Update UI to reflect 0 for current
+        renderCostStats(); // Update UI to reflect 0 for current request cost
         return false; // Indicate failure
     }
 }
@@ -670,12 +711,15 @@ function clearAllHistory() {
         totalOutputTokens = 0; // Reset tokens
         currentInputTokens = 0; // Reset current tokens
         currentOutputTokens = 0; // Reset current tokens
+        currentRequestCost = 0; // Reset current request cost
+        totalCost = 0; // Reset total cost
         lastRawRequestBody = null; // Clear raw API debug data
         lastRawResponseData = null; // Clear raw API debug data
         renderChatHistory(); // Re-render (will be empty)
         renderTokenStats(); // Update token display
+        renderCostStats(); // Update cost display
         saveChatHistoryToLocalStorage(); // Save empty history
-        saveTokenStatsToLocalStorage(); // Save reset token stats
+        saveStatsToLocalStorage(); // Save reset token and cost stats
         errorMessageDiv.textContent = 'All chat history cleared.';
     }
     setTimeout(() => errorMessageDiv.textContent = '', 3000);
@@ -726,7 +770,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadSystemInstructionFromLocalStorage(); // Load system instruction (pre-fills UI and global variable)
     loadSelectedModelFromLocalStorage(); // Load selected model
     loadChatHistoryFromLocalStorage(); // Load chat history (or initialize with welcome)
-    loadTokenStatsFromLocalStorage(); // Load token stats
+    loadStatsFromLocalStorage(); // Load token and cost stats
     loadRawChatHistoryToggleStateFromLocalStorage(); // Load raw chat toggle state
     
     renderChatHistory(); // Render the initial history (including welcome message) and update raw input
@@ -735,4 +779,5 @@ document.addEventListener('DOMContentLoaded', () => {
     // Set the initial selected model based on dropdown and update global variable
     updateSelectedModel(); 
     renderTokenStats(); // Render initial token stats
+    renderCostStats(); // Render initial cost stats
 });
