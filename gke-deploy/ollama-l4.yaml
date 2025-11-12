@@ -1,4 +1,4 @@
-# 0. ConfigMap for Nginx Configuration
+# 0. ConfigMap for Nginx Configuration (NO CHANGE)
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -45,7 +45,7 @@ data:
     }
 ---
 
-# 1. Deployment: Ollama Server with Open WebUI and Nginx Sidecars
+# 1. Deployment: Ollama Server with Open WebUI and Nginx Sidecars (UPDATED)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -65,6 +65,7 @@ spec:
       # Node and Tolerations for GKE Autopilot l4 GPU
       nodeSelector:
         cloud.google.com/gke-accelerator: nvidia-l4
+        cloud.google.com/gke-spot: "true"
       tolerations:
       - key: "nvidia.com/gpu"
         operator: "Equal"
@@ -72,10 +73,9 @@ spec:
         effect: "NoSchedule"
 
       volumes:
-      # Volume 1: Persistent storage for models
+      # Volume 1: EPHEMERAL STORAGE FOR MODELS (UPDATED to EmptyDir)
       - name: ollama-models
-        persistentVolumeClaim:
-          claimName: ollama-l4-pvc
+        emptyDir: {}
       
       # Volume 2: EmptyDir to share TLS certificates.
       - name: tls-certs
@@ -167,7 +167,7 @@ spec:
             cpu: 500m
             memory: 500Mi
 
-      # --- NGINX Sidecar Container (HTTPS Termination) - MODIFIED WITH WAIT ---
+      # --- NGINX Sidecar Container (HTTPS Termination) ---
       - name: nginx-sidecar
         image: nginx:stable-alpine
         # Use sh -c to run a shell script that waits for WebUI before starting Nginx
@@ -212,21 +212,7 @@ spec:
         
 ---
 
-# 2. Persistent Volume Claim (PVC) for Ollama Models - NO CHANGE
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: ollama-l4-pvc
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 300Gi
-
----
-
-# 3. Service to expose the Open WebUI via HTTP (80) and HTTPS (443) - MODIFIED
+# 2. Service to expose the Open WebUI via HTTP (80) and HTTPS (443) (NO CHANGE)
 apiVersion: v1
 kind: Service
 metadata:
