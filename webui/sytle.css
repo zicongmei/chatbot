@@ -322,9 +322,16 @@
             font-size: 1em;
             height: 50px; /* Match textarea height for alignment */
             min-width: 80px;
+            margin-left: 5px; /* Add some space between buttons */
         }
         .chat-input-area button:hover {
             background-color: #0056b3;
+        }
+        .chat-input-area button#stopMessageButton {
+            background-color: #dc3545; /* Red for Stop */
+        }
+        .chat-input-area button#stopMessageButton:hover {
+            background-color: #c82333;
         }
 
         /* Status messages moved to top */

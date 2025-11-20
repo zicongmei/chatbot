@@ -53,6 +53,9 @@ let totalCost = 0; // Cumulative cost of all API calls
 let lastRawRequestBody = null;
 let lastRawResponseData = null;
 
+// New: AbortController for stopping ongoing requests
+let abortController = null;
+
 
 // Get DOM elements
 const geminiApiKeyInput = document.getElementById('geminiApiKey');
@@ -61,6 +64,7 @@ const geminiModelSelect = document.getElementById('geminiModel');
 const chatHistoryDiv = document.getElementById('chatHistory');
 const messageInput = document.getElementById('messageInput');
 const sendMessageButton = document.getElementById('sendMessageButton');
+const stopMessageButton = document.getElementById('stopMessageButton'); // New: Stop button
 const errorMessageDiv = document.getElementById('errorMessage');
 const tokenStatsDiv = document.getElementById('tokenStats');
 const costStatsDiv = document.getElementById('costStats'); // New: Cost stats div
@@ -363,7 +367,13 @@ async function _sendContentToModel(userMessageTextForAPI, contentToSendForAPI) {
         return false; // Indicate failure
     }
 
-    errorMessageDiv.textContent = 'Thinking...'; // Show thinking indicator
+    // Set up AbortController and enable stop button
+    abortController = new AbortController();
+    stopMessageButton.disabled = false;
+    stopMessageButton.classList.remove('hidden');
+    sendMessageButton.disabled = true; // Disable send button during request
+    regenerateSystemReplyButton.disabled = true; // Disable regenerate button during request
+    errorMessageDiv.textContent = 'Thinking... (Click Stop to cancel)'; // Show thinking indicator
 
     // Reset current request token counts and cost at the start of a new API call attempt
     currentInputTokens = 0;
@@ -403,6 +413,7 @@ async function _sendContentToModel(userMessageTextForAPI, contentToSendForAPI) {
                 'X-Goog-Api-Key': currentApiKey,
             },
             body: lastRawRequestBody, // Use the stored stringified body
+            signal: abortController.signal, // Pass the abort signal
         });
 
         if (!response.ok) {
@@ -454,8 +465,13 @@ async function _sendContentToModel(userMessageTextForAPI, contentToSendForAPI) {
         return true; // Indicate success
 
     } catch (error) {
-        console.error('Error sending message:', error);
-        errorMessageDiv.textContent = `Error sending message: ${error.message}`;
+        if (error.name === 'AbortError') {
+            errorMessageDiv.textContent = 'Request cancelled by user.';
+            console.log('Fetch request aborted by user.');
+        } else {
+            console.error('Error sending message:', error);
+            errorMessageDiv.textContent = `Error sending message: ${error.message}`;
+        }
         // On error, current tokens and cost should be 0 as the request failed or was incomplete.
         currentInputTokens = 0;
         currentOutputTokens = 0;
@@ -463,6 +479,21 @@ async function _sendContentToModel(userMessageTextForAPI, contentToSendForAPI) {
         renderTokenStats(); // Update UI to reflect 0 for current
         renderCostStats(); // Update UI to reflect 0 for current request cost
         return false; // Indicate failure
+    } finally {
+        abortController = null; // Clear the controller
+        stopMessageButton.disabled = true;
+        stopMessageButton.classList.add('hidden'); // Hide it again
+        sendMessageButton.disabled = false; // Re-enable send button
+        regenerateSystemReplyButton.disabled = false; // Re-enable regenerate button
+
+        // Clear 'Thinking...' message after a brief delay if it wasn't a user cancellation
+        if (errorMessageDiv.textContent === 'Thinking... (Click Stop to cancel)') {
+            errorMessageDiv.textContent = '';
+        }
+        // If it was cancelled, the message "Request cancelled by user." will remain, clear it after a timeout.
+        if (errorMessageDiv.textContent === 'Request cancelled by user.') {
+            setTimeout(() => errorMessageDiv.textContent = '', 3000);
+        }
     }
 }
 
@@ -749,6 +780,17 @@ function clearAllHistory() {
 setApiKeyButton.addEventListener('click', setApiKey);
 geminiModelSelect.addEventListener('change', updateSelectedModel);
 sendMessageButton.addEventListener('click', sendMessage);
+stopMessageButton.addEventListener('click', () => { // New: Stop button listener
+    if (abortController) {
+        abortController.abort();
+        errorMessageDiv.textContent = 'Request cancelled by user.';
+        stopMessageButton.disabled = true;
+        stopMessageButton.classList.add('hidden');
+        sendMessageButton.disabled = false;
+        regenerateSystemReplyButton.disabled = false;
+    }
+    setTimeout(() => errorMessageDiv.textContent = '', 3000);
+});
 applyRawHistoryButton.addEventListener('click', applyRawHistory);
 debugButton.addEventListener('click', toggleRawChatHistory); // New: Debug button listener
 
@@ -799,4 +841,8 @@ document.addEventListener('DOMContentLoaded', () => {
     updateSelectedModel(); 
     renderTokenStats(); // Render initial token stats
     renderCostStats(); // Render initial cost stats
+
+    // Ensure stop button is hidden and disabled on load
+    stopMessageButton.disabled = true;
+    stopMessageButton.classList.add('hidden');
 });
