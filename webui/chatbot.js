@@ -674,13 +674,9 @@ async function regenerateSystemReply() {
 
     errorMessageDiv.textContent = 'Thinking...';
 
-    // Get current system instruction from the input field.
-    // This is treated as a *new* instruction for this regeneration attempt,
-    // overriding or augmenting any instruction embedded in the original user message.
     const newActiveSystemInstruction = systemInstructionInput.value.trim();
 
     // 1. Remove last model reply if it exists in chatHistory (to regenerate it).
-    // This leaves the last USER message (potentially with an embedded system instruction) as the last entry.
     if (chatHistory.length > 0 && chatHistory[chatHistory.length - 1].role === 'model') {
         chatHistory.pop(); // Remove the last model reply
         renderChatHistory(); // Update UI
@@ -694,41 +690,34 @@ async function regenerateSystemReply() {
         return;
     }
 
-    // Now, the last message in chatHistory is a user message.
-    // We need to create the `contents` array for the API call.
-    // If there's a *new* system instruction in the input field,
-    // we combine it with the *last user message in chatHistory* for the *current API call only*.
-    let contentToSendForAPI = JSON.parse(JSON.stringify(chatHistory)); // Deep copy chatHistory
-
-    // Append the new system instruction to the last user message in the *API content copy*.
+    // 2. If a new system instruction is provided, incorporate it into the LAST USER message in chatHistory.
+    // This ensures the full context for the API call is saved in history BEFORE the call.
     if (newActiveSystemInstruction !== '') {
-        const lastMessageIndex = contentToSendForAPI.length - 1;
-        if (lastMessageIndex >= 0 && contentToSendForAPI[lastMessageIndex].role === 'user') {
-            // Append the new system instruction to the last part of the last user message.
-            const lastUserMessage = contentToSendForAPI[lastMessageIndex];
-            if (lastUserMessage.parts.length > 0) {
-                lastUserMessage.parts[lastUserMessage.parts.length - 1].text += `\n\nSYSTEM CONTEXT: ${newActiveSystemInstruction}`;
-            } else {
-                lastUserMessage.parts.push({ text: `SYSTEM CONTEXT: ${newActiveSystemInstruction}` });
-            }
+        const lastUserMessage = chatHistory[chatHistory.length - 1]; // This is the actual object in chatHistory
+        if (lastUserMessage.parts.length > 0) {
+            lastUserMessage.parts[lastUserMessage.parts.length - 1].text += `\n\nSYSTEM CONTEXT: ${newActiveSystemInstruction}`;
+        } else {
+            lastUserMessage.parts.push({ text: `SYSTEM CONTEXT: ${newActiveSystemInstruction}` });
         }
-    }
-    
-    // Clear system instruction input field and its localStorage entry if it was active,
-    // as it's typically a 'one-shot' instruction per request.
-    if (newActiveSystemInstruction !== '') {
+
+        // 3. Clear system instruction input field and its localStorage entry AFTER it's appended to chatHistory.
         systemInstructionInput.value = ''; // Clear UI
         systemInstruction = ''; // Clear global variable
         setLocalStorageItem('systemInstruction', ''); // Clear from local storage
-        updateRawHistoryInput(); // Update raw history display
-        errorMessageDiv.textContent = "Background instruction applied and cleared for regeneration.";
+        
+        // 4. Re-render chat history to show the user message with the newly appended system context.
+        // This ensures the UI reflects the history exactly as it will be sent to the API.
+        renderChatHistory(); // This will also call updateRawHistoryInput indirectly
+        saveChatHistoryToLocalStorage(); // Save updated history
+        
+        errorMessageDiv.textContent = "Background instruction applied to user message for regeneration and cleared.";
         setTimeout(() => errorMessageDiv.textContent = '', 3000);
     }
 
-    // The first argument `userMessageTextForAPI` to `_sendContentToModel` is mostly for logging,
-    // we pass the actual text from the last user message in history (before any temp new instruction).
+    // Now, chatHistory already contains the system instruction within the last user message (if provided).
+    // The `_sendContentToModel` function will use this updated `chatHistory`.
     const lastUserMessageText = chatHistory[chatHistory.length - 1].parts.map(part => part.text).join('\n');
-    await _sendContentToModel(lastUserMessageText, contentToSendForAPI);
+    await _sendContentToModel(lastUserMessageText, chatHistory); // Send the modified chatHistory
     adjustTextareaHeight(); // Re-adjust
 }
 
