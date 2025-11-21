@@ -228,7 +228,7 @@ function loadChatHistoryFromLocalStorage() {
   Multi-line messages are not allowed - each individual message must be a single paragraph.
   Avoid unnecessary and unoriginal repetition of previous messages.
   Write the next message - remember to make them interesting, authentic, descriptive, natural, engaging, and creative.
-  Use the same language as input or previous diaglog`;
+  Use the same language as input or previous diaglog. Do not include the thought in repsonse text.`;
         chatHistory.push({ role: 'model', parts: [{ text: initialInstruction }] });
         console.log('Initialized chat history with the roleplay instruction.');
         saveChatHistoryToLocalStorage(); // Save this initial state
