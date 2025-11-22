@@ -223,7 +223,7 @@ function loadChatHistoryFromLocalStorage() {
     // and there's no system instruction already providing context, add the instruction message.
     if (chatHistory.length === 0 && !systemInstruction) {
         const initialInstruction = `Your task is to write the messages in this chat/roleplay.
-  Use *asterisks* for actions, and (parentheses) for the internal thought processes of a character.
+  Use *asterisks* for actions, and (parantheses) for the internal thought processes of a character.
   NEVER try to "wrap up" the roleplay. This is a never-ending roleplay.
   Multi-line messages are not allowed - each individual message must be a single paragraph.
   Avoid unnecessary and unoriginal repetition of previous messages.
@@ -396,11 +396,19 @@ async function _sendContentToModel(userMessageTextForAPI, contentToSendForAPI) {
             contents: contentToSendForAPI, // This will be the actual history for the API call, potentially with appended system instruction part
             generationConfig: {
                 maxOutputTokens: 5000,
-                thinkingConfig: {
-                    thinkingBudget: -1
-                }
             },
         };
+
+        // Configure thinkingConfig based on the selected model
+        if (selectedModel === 'gemini-3-pro-preview') {
+            requestBody.generationConfig.thinkingConfig = {
+                thinkingLevel: 'high'
+            };
+        } else {
+            requestBody.generationConfig.thinkingConfig = {
+                thinkingBudget: -1
+            };
+        }
 
         // Store the raw request body before sending
         lastRawRequestBody = JSON.stringify(requestBody, null, 2);
