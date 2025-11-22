@@ -92,6 +92,7 @@ const loadChatFileInput = document.getElementById('loadChatFileInput');
 const removeLastEntryButton = document.getElementById('removeLastEntryButton'); // New
 const clearAllHistoryButton = document.getElementById('clearAllHistoryButton'); // New
 const regenerateSystemReplyButton = document.getElementById('regenerateSystemReplyButton'); // New
+const cleanThinkingSignatureButton = document.getElementById('cleanThinkingSignatureButton'); // New
 
 // New DOM elements for API Debugging
 const showApiDebugButton = document.getElementById('showApiDebugButton');
@@ -814,6 +815,50 @@ async function regenerateSystemReply() {
     adjustTextareaHeight(); // Re-adjust
 }
 
+// Function to clean the thinking signature from the last model response
+function cleanThinkingSignature() {
+    if (chatHistory.length === 0) {
+        errorMessageDiv.textContent = 'No chat history to clean.';
+        setTimeout(() => errorMessageDiv.textContent = '', 3000);
+        return;
+    }
+
+    // Find the last model entry that has a thoughtSignature
+    let lastModelEntryIndex = -1;
+    for (let i = chatHistory.length - 1; i >= 0; i--) {
+        const entry = chatHistory[i];
+        if (entry.role === 'model' && entry.parts && entry.parts.length > 0) {
+            // Check all parts for thoughtSignature, typically it's in the first part
+            const partWithSignature = entry.parts.find(p => p.thoughtSignature);
+            if (partWithSignature) {
+                lastModelEntryIndex = i;
+                break;
+            }
+        }
+    }
+
+    if (lastModelEntryIndex !== -1) {
+        const entryToClean = chatHistory[lastModelEntryIndex];
+        const newParts = entryToClean.parts.map(part => {
+            if (part.thoughtSignature) {
+                // Destructure to exclude thoughtSignature
+                // eslint-disable-next-line no-unused-vars
+                const { thoughtSignature, ...rest } = part; 
+                return rest;
+            }
+            return part;
+        });
+        chatHistory[lastModelEntryIndex].parts = newParts;
+        
+        renderChatHistory(); // Update raw history view (since thoughtSignature is in the data)
+        saveChatHistoryToLocalStorage();
+        errorMessageDiv.textContent = 'Thinking signature removed from the last model response.';
+    } else {
+        errorMessageDiv.textContent = 'No model response with a thinking signature found in history.';
+    }
+    setTimeout(() => errorMessageDiv.textContent = '', 3000);
+}
+
 
 // Function to clear all chat history
 function clearAllHistory() {
@@ -894,6 +939,7 @@ loadChatFileInput.addEventListener('change', handleChatFileLoad);
 removeLastEntryButton.addEventListener('click', removeLastEntry); // New
 clearAllHistoryButton.addEventListener('click', clearAllHistory); // New
 regenerateSystemReplyButton.addEventListener('click', regenerateSystemReply); // New
+cleanThinkingSignatureButton.addEventListener('click', cleanThinkingSignature); // New
 
 
 messageInput.addEventListener('keydown', (event) => {
