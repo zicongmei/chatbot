@@ -132,6 +132,29 @@
             padding-right: 30px;
         }
 
+        /* New styles for thought signature checkbox section */
+        .thought-signature-config-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #f0f4c3; /* Light yellow-green */
+            display: flex;
+            align-items: center;
+        }
+        .thought-signature-config-section label {
+            font-weight: bold;
+            color: #558b2f; /* Darker yellow-green */
+            display: flex; /* To align checkbox and text nicely */
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+        .thought-signature-config-section input[type="checkbox"] {
+            transform: scale(1.2); /* Make checkbox slightly larger */
+            margin-right: 5px;
+        }
+
 
         /* New styles for system instruction */
         .system-instruction-section {

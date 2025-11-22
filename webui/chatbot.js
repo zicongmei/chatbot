@@ -14,6 +14,9 @@ let currentOutputTokens = 0; // New: Tokens for the current request
 let thinkingBudget = -1; // Default for non-gemini3 models
 let thinkingLevel = 'low'; // Default for gemini3 models
 
+// New: Variable for saving thought signature
+let saveThoughtSignature = true; // Default to saving thought signature
+
 // New: Variables for cost calculation
 const MODEL_PRICES = {
     'gemini-2.5-flash': { 
@@ -104,6 +107,9 @@ const apiResponseBody = document.getElementById('apiResponseBody');
 const thinkingConfigSection = document.getElementById('thinkingConfigSection');
 const thinkingBudgetInput = document.getElementById('thinkingBudgetInput');
 const thinkingLevelSelect = document.getElementById('thinkingLevelSelect');
+
+// New DOM element for thought signature checkbox
+const saveThoughtSignatureCheckbox = document.getElementById('saveThoughtSignatureCheckbox');
 
 
 // Utility functions for localStorage
@@ -287,6 +293,16 @@ function loadThinkingConfigFromLocalStorage() {
         thinkingLevel = storedLevel;
         thinkingLevelSelect.value = thinkingLevel;
         console.log(`Thinking level loaded: ${thinkingLevel}`);
+    }
+}
+
+// Function to load the saveThoughtSignature state from localStorage
+function loadSaveThoughtSignatureStateFromLocalStorage() {
+    const storedState = getLocalStorageItem('saveThoughtSignature');
+    if (storedState !== null) {
+        saveThoughtSignature = (storedState === 'true');
+        saveThoughtSignatureCheckbox.checked = saveThoughtSignature;
+        console.log(`Save thought signature state loaded: ${saveThoughtSignature}`);
     }
 }
 
@@ -489,7 +505,11 @@ async function _sendContentToModel(userMessageTextForAPI, contentToSendForAPI) {
             data.candidates[0].content && data.candidates[0].content.parts &&
             data.candidates[0].content.parts.length > 0) {
             modelResponseText = data.candidates[0].content.parts[0].text;
-            thoughtSignature = data.candidates[0].content.parts[0].thoughtSignature;
+            
+            // Only capture thoughtSignature if the saveThoughtSignature flag is true
+            if (saveThoughtSignature) {
+                thoughtSignature = data.candidates[0].content.parts[0].thoughtSignature;
+            }
         }
 
         // Update token counts and calculate cost
@@ -515,9 +535,9 @@ async function _sendContentToModel(userMessageTextForAPI, contentToSendForAPI) {
             saveStatsToLocalStorage(); // Save updated tokens and cost
         }
 
-        // Add model response to history, including thoughtSignature if present
+        // Add model response to history, including thoughtSignature if present (which is conditional now)
         const modelPart = { text: modelResponseText };
-        if (thoughtSignature) {
+        if (thoughtSignature) { // This check is still necessary if thoughtSignature was null from the API
             modelPart.thoughtSignature = thoughtSignature;
         }
         chatHistory.push({ role: 'model', parts: [modelPart] });
@@ -929,6 +949,12 @@ thinkingLevelSelect.addEventListener('change', () => {
     setLocalStorageItem('thinkingLevel', thinkingLevel);
 });
 
+// Thought Signature checkbox event
+saveThoughtSignatureCheckbox.addEventListener('change', () => {
+    saveThoughtSignature = saveThoughtSignatureCheckbox.checked;
+    setLocalStorageItem('saveThoughtSignature', saveThoughtSignature.toString());
+});
+
 
 // Chat Save/Load events
 saveChatButton.addEventListener('click', downloadChatHistory);
@@ -956,6 +982,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadSystemInstructionFromLocalStorage(); // Load system instruction (pre-fills UI and global variable)
     loadSelectedModelFromLocalStorage(); // Load selected model
     loadThinkingConfigFromLocalStorage(); // Load thinking config (before updating visibility)
+    loadSaveThoughtSignatureStateFromLocalStorage(); // Load thought signature checkbox state
     loadChatHistoryFromLocalStorage(); // Load chat history (or initialize with welcome)
     loadStatsFromLocalStorage(); // Load token and cost stats
     loadRawChatHistoryToggleStateFromLocalStorage(); // Load raw chat toggle state
