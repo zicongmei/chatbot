@@ -92,6 +92,47 @@
             padding-right: 30px; /* Make space for the arrow */
         }
 
+        /* New styles for thinking config section */
+        .thinking-config-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #ffebee; /* Light red/pink for thinking config */
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .thinking-config-section .thinking-control-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .thinking-config-section label {
+            font-weight: bold;
+            color: #d32f2f; /* Darker red */
+            white-space: nowrap;
+            flex-shrink: 0; /* Prevent label from shrinking */
+        }
+        .thinking-config-section input[type="number"],
+        .thinking-config-section select {
+            flex-grow: 1;
+            padding: 8px 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 0.9em;
+            min-width: 80px;
+        }
+        .thinking-config-section select {
+            appearance: none;
+            background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http://www.w3.org/2000/svg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23d32f2f%22%20d%3D%22M287%20164.7c-4.6%204.6-10.7%207-16.5%207-5.9%200-11.7-2.3-16.5-7L146.2%2054.6%2042.4%20158.4c-4.8%204.6-10.9%207-16.5%207s-11.7-2.3-16.5-7c-9.1-9.3-9.1-24.1-.2-33.3L130%2010.5c9.2-9.2%2024.1-9.2%2033.3%200L287%20131.4c9.1%209.2%209.1%2024.1-.1%2033.3z%22/%3E%3Csvg%3E');
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            background-size: 12px;
+            padding-right: 30px;
+        }
+
+
         /* New styles for system instruction */
         .system-instruction-section {
             margin-bottom: 20px;

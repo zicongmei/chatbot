@@ -74,6 +74,20 @@
             </select>
         </div>
 
+        <!-- New section for Thinking Config -->
+        <div id="thinkingConfigSection" class="thinking-config-section">
+            <div id="thinkingBudgetContainer" class="thinking-control-container hidden">
+                <label for="thinkingBudgetInput">Thinking Budget (Non-Gemini3, -1 for default):</label>
+                <input id="thinkingBudgetInput" type="number" value="-1" min="-1">
+            </div>
+            <div id="thinkingLevelContainer" class="thinking-control-container hidden">
+                <label for="thinkingLevelSelect">Thinking Level (Gemini3):</label>
+                <select id="thinkingLevelSelect">
+                    <option value="low">low</option>
+                    <option value="high">high</option>
+                </select>
+            </div>
+        </div>
 
         <div class="chat-actions-section">
             <button id="saveChatButton">Save Chat (to file)</button>

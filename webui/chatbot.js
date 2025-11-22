@@ -10,6 +10,10 @@ let totalOutputTokens = 0;
 let currentInputTokens = 0; // New: Tokens for the current request
 let currentOutputTokens = 0; // New: Tokens for the current request
 
+// New: Variables for thinking budget/level
+let thinkingBudget = -1; // Default for non-gemini3 models
+let thinkingLevel = 'low'; // Default for gemini3 models
+
 // New: Variables for cost calculation
 const MODEL_PRICES = {
     'gemini-2.5-flash': { 
@@ -95,6 +99,11 @@ const apiDebugContent = document.getElementById('apiDebugContent');
 const apiRequestBody = document.getElementById('apiRequestBody');
 const apiResponseBody = document.getElementById('apiResponseBody');
 
+// New DOM elements for thinking config
+const thinkingConfigSection = document.getElementById('thinkingConfigSection');
+const thinkingBudgetInput = document.getElementById('thinkingBudgetInput');
+const thinkingLevelSelect = document.getElementById('thinkingLevelSelect');
+
 
 // Utility functions for localStorage
 function setLocalStorageItem(name, value) {
@@ -150,6 +159,7 @@ function loadApiKeyFromLocalStorage() {
 function updateSelectedModel() {
     selectedModel = geminiModelSelect.value;
     setLocalStorageItem('selectedModel', selectedModel); // Save selected model to localStorage
+    updateThinkingControlsVisibility(); // Update visibility of thinking config controls
     console.log(`Selected model: ${selectedModel}`);
     errorMessageDiv.textContent = `Model set to: ${selectedModel}`;
     setTimeout(() => errorMessageDiv.textContent = '', 3000);
@@ -166,6 +176,7 @@ function loadSelectedModelFromLocalStorage() {
         // If no model is stored, ensure the dropdown reflects the default
         geminiModelSelect.value = selectedModel;
     }
+    updateThinkingControlsVisibility(); // Call after loading model to set initial visibility
 }
 
 // Function to load system instruction from localStorage (for initial pre-fill)
@@ -259,6 +270,23 @@ function loadStatsFromLocalStorage() {
         totalCost = parseFloat(storedTotalCost);
     }
     console.log(`Stats loaded: Input=${totalInputTokens}, Output=${totalOutputTokens}, TotalCost=$${totalCost.toFixed(5)}`);
+}
+
+// Function to load thinking config from localStorage
+function loadThinkingConfigFromLocalStorage() {
+    const storedBudget = getLocalStorageItem('thinkingBudget');
+    if (storedBudget !== null) {
+        thinkingBudget = parseInt(storedBudget, 10);
+        thinkingBudgetInput.value = thinkingBudget;
+        console.log(`Thinking budget loaded: ${thinkingBudget}`);
+    }
+
+    const storedLevel = getLocalStorageItem('thinkingLevel');
+    if (storedLevel) {
+        thinkingLevel = storedLevel;
+        thinkingLevelSelect.value = thinkingLevel;
+        console.log(`Thinking level loaded: ${thinkingLevel}`);
+    }
 }
 
 // Function to update the raw chat history textarea
@@ -360,6 +388,26 @@ function renderCostStats() {
     }
 }
 
+// Function to update visibility of thinking budget/level controls
+function updateThinkingControlsVisibility() {
+    if (!thinkingConfigSection || !thinkingBudgetInput || !thinkingLevelSelect) return;
+
+    // Hide both containers initially
+    thinkingBudgetInput.parentElement.classList.add('hidden');
+    thinkingLevelSelect.parentElement.classList.add('hidden');
+
+    if (selectedModel.startsWith('gemini-3')) {
+        thinkingLevelSelect.parentElement.classList.remove('hidden');
+    } else {
+        thinkingBudgetInput.parentElement.classList.remove('hidden');
+    }
+
+    setLocalStorageItem('selectedModel', selectedModel); // Ensure model is saved
+    setLocalStorageItem('thinkingBudget', thinkingBudget.toString()); // Save current thinkingBudget
+    setLocalStorageItem('thinkingLevel', thinkingLevel); // Save current thinkingLevel
+}
+
+
 // Helper function to send content to the Gemini API
 async function _sendContentToModel(userMessageTextForAPI, contentToSendForAPI) {
     if (!currentApiKey) {
@@ -396,18 +444,15 @@ async function _sendContentToModel(userMessageTextForAPI, contentToSendForAPI) {
             contents: contentToSendForAPI, // This will be the actual history for the API call, potentially with appended system instruction part
             generationConfig: {
                 maxOutputTokens: 5000,
+                thinkingConfig: {} // Initialize thinkingConfig
             },
         };
 
         // Configure thinkingConfig based on the selected model
-        if (selectedModel === 'gemini-3-pro-preview') {
-            requestBody.generationConfig.thinkingConfig = {
-                thinkingLevel: 'high'
-            };
+        if (selectedModel.startsWith('gemini-3')) {
+            requestBody.generationConfig.thinkingConfig.thinkingLevel = thinkingLevel;
         } else {
-            requestBody.generationConfig.thinkingConfig = {
-                thinkingBudget: -1
-            };
+            requestBody.generationConfig.thinkingConfig.thinkingBudget = thinkingBudget;
         }
 
         // Store the raw request body before sending
@@ -823,6 +868,23 @@ systemInstructionInput.addEventListener('input', () => {
 });
 clearSystemInstructionButton.addEventListener('click', clearSystemInstruction); // New: Clear system instruction button listener
 
+// Thinking Config events
+thinkingBudgetInput.addEventListener('input', () => {
+    const value = parseInt(thinkingBudgetInput.value, 10);
+    if (!isNaN(value)) {
+        thinkingBudget = value;
+        setLocalStorageItem('thinkingBudget', thinkingBudget.toString());
+    } else if (thinkingBudgetInput.value.trim() === '') {
+        thinkingBudget = -1; // Default if cleared
+        setLocalStorageItem('thinkingBudget', '-1');
+    }
+});
+thinkingLevelSelect.addEventListener('change', () => {
+    thinkingLevel = thinkingLevelSelect.value;
+    setLocalStorageItem('thinkingLevel', thinkingLevel);
+});
+
+
 // Chat Save/Load events
 saveChatButton.addEventListener('click', downloadChatHistory);
 loadChatButton.addEventListener('click', () => loadChatFileInput.click()); // Trigger file input click
@@ -847,6 +909,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadApiKeyFromLocalStorage(); // Load API key
     loadSystemInstructionFromLocalStorage(); // Load system instruction (pre-fills UI and global variable)
     loadSelectedModelFromLocalStorage(); // Load selected model
+    loadThinkingConfigFromLocalStorage(); // Load thinking config (before updating visibility)
     loadChatHistoryFromLocalStorage(); // Load chat history (or initialize with welcome)
     loadStatsFromLocalStorage(); // Load token and cost stats
     loadRawChatHistoryToggleStateFromLocalStorage(); // Load raw chat toggle state
@@ -855,7 +918,7 @@ document.addEventListener('DOMContentLoaded', () => {
     adjustTextareaHeight(); // Adjust textarea height on page load
 
     // Set the initial selected model based on dropdown and update global variable
-    updateSelectedModel(); 
+    updateSelectedModel(); // This will now also call updateThinkingControlsVisibility()
     renderTokenStats(); // Render initial token stats
     renderCostStats(); // Render initial cost stats
 
