@@ -436,11 +436,15 @@ async function _sendContentToModel(userMessageTextForAPI, contentToSendForAPI) {
         // Store the raw successful response
         lastRawResponseData = JSON.stringify(data, null, 2);
         
-        const modelResponseText = data.candidates && data.candidates.length > 0 &&
-                                  data.candidates[0].content && data.candidates[0].content.parts &&
-                                  data.candidates[0].content.parts.length > 0
-                                  ? data.candidates[0].content.parts[0].text
-                                  : 'No response from model.';
+        let modelResponseText = 'No response from model.';
+        let thoughtSignature = null;
+
+        if (data.candidates && data.candidates.length > 0 &&
+            data.candidates[0].content && data.candidates[0].content.parts &&
+            data.candidates[0].content.parts.length > 0) {
+            modelResponseText = data.candidates[0].content.parts[0].text;
+            thoughtSignature = data.candidates[0].content.parts[0].thoughtSignature;
+        }
 
         // Update token counts and calculate cost
         if (data.usageMetadata) {
@@ -465,8 +469,13 @@ async function _sendContentToModel(userMessageTextForAPI, contentToSendForAPI) {
             saveStatsToLocalStorage(); // Save updated tokens and cost
         }
 
-        // Add model response to history
-        chatHistory.push({ role: 'model', parts: [{ text: modelResponseText }] });
+        // Add model response to history, including thoughtSignature if present
+        const modelPart = { text: modelResponseText };
+        if (thoughtSignature) {
+            modelPart.thoughtSignature = thoughtSignature;
+        }
+        chatHistory.push({ role: 'model', parts: [modelPart] });
+
         errorMessageDiv.textContent = ''; // Clear thinking message
         renderChatHistory(); // Render the new model message and update raw history input
         saveChatHistoryToLocalStorage(); // Save updated history
