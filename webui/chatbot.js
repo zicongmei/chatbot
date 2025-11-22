@@ -110,6 +110,7 @@ const thinkingLevelSelect = document.getElementById('thinkingLevelSelect');
 
 // New DOM element for thought signature checkbox
 const saveThoughtSignatureCheckbox = document.getElementById('saveThoughtSignatureCheckbox');
+const cleanupAllThoughtSignaturesButton = document.getElementById('cleanupAllThoughtSignaturesButton'); // New: Cleanup all thought signatures button
 
 
 // Utility functions for localStorage
@@ -879,6 +880,43 @@ function cleanThinkingSignature() {
     setTimeout(() => errorMessageDiv.textContent = '', 3000);
 }
 
+// Function to cleanup ALL thinking signatures from chat history
+function cleanupAllThoughtSignaturesInHistory() {
+    if (chatHistory.length === 0) {
+        errorMessageDiv.textContent = 'No chat history to clean.';
+        setTimeout(() => errorMessageDiv.textContent = '', 3000);
+        return;
+    }
+
+    let cleanedCount = 0;
+    const newChatHistory = chatHistory.map(entry => {
+        if (entry.role === 'model' && entry.parts && entry.parts.length > 0) {
+            const newParts = entry.parts.map(part => {
+                if (part.thoughtSignature) {
+                    cleanedCount++;
+                    // Destructure to exclude thoughtSignature
+                    // eslint-disable-next-line no-unused-vars
+                    const { thoughtSignature, ...rest } = part;
+                    return rest;
+                }
+                return part;
+            });
+            return { ...entry, parts: newParts };
+        }
+        return entry;
+    });
+
+    if (cleanedCount > 0) {
+        chatHistory = newChatHistory; // Replace with the cleaned history
+        renderChatHistory();
+        saveChatHistoryToLocalStorage();
+        errorMessageDiv.textContent = `Removed ${cleanedCount} thinking signature(s) from history.`;
+    } else {
+        errorMessageDiv.textContent = 'No thinking signatures found in history to clean.';
+    }
+    setTimeout(() => errorMessageDiv.textContent = '', 3000);
+}
+
 
 // Function to clear all chat history
 function clearAllHistory() {
@@ -954,6 +992,8 @@ saveThoughtSignatureCheckbox.addEventListener('change', () => {
     saveThoughtSignature = saveThoughtSignatureCheckbox.checked;
     setLocalStorageItem('saveThoughtSignature', saveThoughtSignature.toString());
 });
+// New: Cleanup All Thought Signatures button event
+cleanupAllThoughtSignaturesButton.addEventListener('click', cleanupAllThoughtSignaturesInHistory);
 
 
 // Chat Save/Load events

@@ -140,7 +140,8 @@
             border-radius: 8px;
             background-color: #f0f4c3; /* Light yellow-green */
             display: flex;
-            align-items: center;
+            flex-direction: column; /* Changed to column to stack checkbox and button */
+            gap: 10px; /* Space between elements */
         }
         .thought-signature-config-section label {
             font-weight: bold;
@@ -153,6 +154,21 @@
         .thought-signature-config-section input[type="checkbox"] {
             transform: scale(1.2); /* Make checkbox slightly larger */
             margin-right: 5px;
+        }
+        .thought-signature-config-section .cleanup-button {
+            padding: 8px 15px;
+            background-color: #ff5722; /* Deep Orange for cleanup/warning */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: bold;
+            align-self: flex-start; /* Align to the left, under the checkbox */
+            max-width: fit-content; /* Only take necessary width */
+        }
+        .thought-signature-config-section .cleanup-button:hover {
+            background-color: #e64a19; /* Darker Deep Orange */
         }
 
 
