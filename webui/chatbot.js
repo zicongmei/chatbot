@@ -63,6 +63,12 @@ let lastRawResponseData = null;
 // New: AbortController for stopping ongoing requests
 let abortController = null;
 
+// New: Variables for font size adjustment
+let chatFontSize = 1.0; // Default font size multiplier (in em)
+const MIN_FONT_SIZE = 0.4;
+const MAX_FONT_SIZE = 4;
+const FONT_SIZE_STEP = 0.1;
+
 
 // Get DOM elements
 const geminiApiKeyInput = document.getElementById('geminiApiKey');
@@ -111,6 +117,11 @@ const thinkingLevelSelect = document.getElementById('thinkingLevelSelect');
 // New DOM element for thought signature checkbox
 const saveThoughtSignatureCheckbox = document.getElementById('saveThoughtSignatureCheckbox');
 const cleanupAllThoughtSignaturesButton = document.getElementById('cleanupAllThoughtSignaturesButton'); // New: Cleanup all thought signatures button
+
+// New DOM elements for font size adjustment
+const increaseFontSizeButton = document.getElementById('increaseFontSizeButton');
+const decreaseFontSizeButton = document.getElementById('decreaseFontSizeButton');
+const resetFontSizeButton = document.getElementById('resetFontSizeButton'); // New: Reset font size button
 
 
 // Utility functions for localStorage
@@ -306,6 +317,53 @@ function loadSaveThoughtSignatureStateFromLocalStorage() {
         console.log(`Save thought signature state loaded: ${saveThoughtSignature}`);
     }
 }
+
+// New: Function to apply the current chat font size to the CSS variable
+function updateChatFontSize() {
+    document.documentElement.style.setProperty('--chat-font-size', `${chatFontSize}em`);
+    setLocalStorageItem('chatFontSize', chatFontSize.toString());
+}
+
+// New: Functions to adjust font size
+function increaseFontSize() {
+    if (chatFontSize < MAX_FONT_SIZE) {
+        chatFontSize = parseFloat((chatFontSize + FONT_SIZE_STEP).toFixed(1));
+        updateChatFontSize();
+    }
+}
+
+function decreaseFontSize() {
+    if (chatFontSize > MIN_FONT_SIZE) {
+        chatFontSize = parseFloat((chatFontSize - FONT_SIZE_STEP).toFixed(1));
+        updateChatFontSize();
+    }
+}
+
+// New: Function to reset font size
+function resetFontSize() {
+    chatFontSize = 1.0; // Reset to default
+    updateChatFontSize();
+    errorMessageDiv.textContent = 'Font size reset to default.';
+    setTimeout(() => errorMessageDiv.textContent = '', 3000);
+}
+
+
+// New: Load font size from localStorage
+function loadChatFontSizeFromLocalStorage() {
+    const storedFontSize = getLocalStorageItem('chatFontSize');
+    if (storedFontSize) {
+        chatFontSize = parseFloat(storedFontSize);
+        if (isNaN(chatFontSize)) { // Fallback if parsing fails
+            chatFontSize = 1.0;
+        }
+        chatFontSize = Math.max(MIN_FONT_SIZE, Math.min(MAX_FONT_SIZE, chatFontSize)); // Clamp to min/max
+        console.log(`Chat font size loaded: ${chatFontSize}`);
+    } else {
+        chatFontSize = 1.0; // Default if nothing in local storage
+    }
+    updateChatFontSize(); // Apply the loaded or default font size
+}
+
 
 // Function to update the raw chat history textarea
 function updateRawHistoryInput() {
@@ -1007,6 +1065,11 @@ clearAllHistoryButton.addEventListener('click', clearAllHistory); // New
 regenerateSystemReplyButton.addEventListener('click', regenerateSystemReply); // New
 cleanThinkingSignatureButton.addEventListener('click', cleanThinkingSignature); // New
 
+// New: Font size adjustment events
+increaseFontSizeButton.addEventListener('click', increaseFontSize);
+decreaseFontSizeButton.addEventListener('click', decreaseFontSize);
+resetFontSizeButton.addEventListener('click', resetFontSize); // New: Reset font size button listener
+
 
 messageInput.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -1026,6 +1089,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadChatHistoryFromLocalStorage(); // Load chat history (or initialize with welcome)
     loadStatsFromLocalStorage(); // Load token and cost stats
     loadRawChatHistoryToggleStateFromLocalStorage(); // Load raw chat toggle state
+    loadChatFontSizeFromLocalStorage(); // Load and apply font size
     
     renderChatHistory(); // Render the initial history (including welcome message) and update raw input
     adjustTextareaHeight(); // Adjust textarea height on page load

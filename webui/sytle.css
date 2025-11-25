@@ -242,6 +242,40 @@
             background-color: #00838f; /* Darker cyan */
         }
 
+        /* Root font size variable */
+        :root {
+            --chat-font-size: 1em; /* Default font size */
+        }
+
+        /* Chat history font size controls */
+        .chat-history-controls {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 10px; /* Space above chat history */
+            justify-content: flex-end; /* Align to the right */
+            padding: 5px;
+            background-color: #f0f8ff; /* Light blue background */
+            border-radius: 5px;
+            border: 1px solid #e0e0e0;
+        }
+        .chat-history-controls button {
+            padding: 5px 10px;
+            font-size: 1em;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background-color: #f0f0f0;
+            min-width: 30px;
+        }
+        .chat-history-controls button:hover {
+            background-color: #e0e0e0;
+        }
+        .chat-history-controls span {
+            font-weight: bold;
+            color: #555;
+            margin-left: 5px;
+        }
 
         .chat-history {
             flex-grow: 1;
@@ -278,6 +312,7 @@
         /* Removed contenteditable specific styles as we're using a separate raw editor */
         .message-bubble p {
             margin: 0;
+            font-size: var(--chat-font-size); /* Use the CSS variable here */
         }
 
         /* New styles for raw chat history section */
