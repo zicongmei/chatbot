@@ -22,10 +22,10 @@
         <!-- Chat History Area (Editable & Auto-expanding) -->
         <textarea class="chat-history-box" id="chatHistoryBox" placeholder="Chat history will appear here. You can edit this text directly..."></textarea>
         <div id="errorMessage" class="error-message"></div>
-      
+
         <!-- User Input Area -->
         <div class="chat-input-area">
-            <textarea id="messageInput" placeholder="Type a message for User..." rows="1"></textarea>
+            <textarea id="messageInput" placeholder="Type a message..." rows="1"></textarea>
             <button id="sendUserMessageButton">Add as User</button>
         </div>
 
@@ -62,6 +62,12 @@
             </div>
         </div>
 
+        <!-- User Name Section -->
+        <div class="user-name-section">
+            <label for="userNameInput">Your Name:</label>
+            <input id="userNameInput" type="text" value="User">
+        </div>
+      
         <!-- System Instruction -->
         <div class="system-instruction-section">
             <label for="systemInstructionInput">Background / System Context:</label>

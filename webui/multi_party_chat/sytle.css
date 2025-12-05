@@ -233,7 +233,7 @@ body {
 }
 
 /* API & Config */
-.api-key-section, .model-selection-section {
+.api-key-section, .model-selection-section, .user-name-section { /* Added .user-name-section */
     margin-bottom: 10px;
     padding: 10px;
     background-color: #f5f5f5;
@@ -242,7 +242,7 @@ body {
     align-items: center;
     gap: 10px;
 }
-.api-key-section input, .model-selection-section select {
+.api-key-section input, .model-selection-section select, .user-name-section input { /* Added .user-name-section input */
     flex-grow: 1;
     padding: 5px;
 }

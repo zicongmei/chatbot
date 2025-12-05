@@ -2,6 +2,7 @@
 
 let chatHistory = []; // Array of { speaker: string, text: string, thoughtSignature?: string }
 let botRoles = []; // Array of strings representing role names
+let userName = 'User'; // Default user name
 let currentApiKey = '';
 let selectedModel = 'gemini-2.5-flash-lite';
 let systemInstruction = 'Your task is to write the messages in this chat/roleplay. Use *asterisks* for actions, and (parantheses) for the internal thought processes of a character. NEVER try to "wrap up" the roleplay. This is a never-ending roleplay. Multi-line messages are not allowed - each individual message must be a single paragraph. Avoid unnecessary and unoriginal repetition of previous messages. Write the next message - remember to make them interesting, authentic, descriptive, natural, engaging, and creative. Use the same language as input or previous diaglog. Do not include the thought in repsonse text.'; 
@@ -101,6 +102,9 @@ const addRoleButton = document.getElementById('addRoleButton');
 const activeRolesList = document.getElementById('activeRolesList');
 const botResponseButtonsContainer = document.getElementById('botResponseButtonsContainer');
 
+// New DOM Element for User Name
+const userNameInput = document.getElementById('userNameInput');
+
 // --- LocalStorage Utils ---
 function setLocalStorageItem(name, value) {
     try { localStorage.setItem(STORAGE_PREFIX + name, value); } catch (e) { console.error(e); }
@@ -173,6 +177,34 @@ function updateThinkingControlsVisibility() {
     }
 }
 
+// --- User Name Management ---
+function loadUserName() {
+    const storedName = getLocalStorageItem('userName');
+    if (storedName) {
+        userName = storedName;
+        userNameInput.value = storedName;
+    } else {
+        userNameInput.value = userName; // Set default in input if not in storage
+    }
+    updateUserMessagePlaceholder();
+}
+
+function setUserName() {
+    const newName = userNameInput.value.trim();
+    if (newName) {
+        userName = newName;
+    } else {
+        userName = 'User'; // Revert to default if empty
+        userNameInput.value = 'User'; // Also update the input field
+    }
+    setLocalStorageItem('userName', userName);
+    updateUserMessagePlaceholder();
+}
+
+function updateUserMessagePlaceholder() {
+    messageInput.placeholder = `Type a message for ${userName}...`;
+}
+
 // --- Font Size ---
 function updateChatFontSize() {
     document.documentElement.style.setProperty('--chat-font-size', `${chatFontSize}em`);
@@ -208,8 +240,8 @@ function loadRolesFromLocalStorage() {
 function addRole() {
     const name = newRoleNameInput.value.trim();
     if (!name) return;
-    if (botRoles.includes(name)) {
-        errorMessageDiv.textContent = 'Role already exists.';
+    if (botRoles.includes(name) || name === userName || name === 'Narrator' || name === 'System') { // Prevent role name conflict with user/narrator/system
+        errorMessageDiv.textContent = `Role name "${name}" is reserved or already exists.`;
         setTimeout(() => errorMessageDiv.textContent = '', 3000);
         return;
     }
@@ -338,7 +370,7 @@ function addUserMessage() {
     if (!text) return;
     
     const separator = chatHistoryBox.value ? '\n\n' : '';
-    chatHistoryBox.value += `${separator}User: ${text}`;
+    chatHistoryBox.value += `${separator}${userName}: ${text}`;
     
     messageInput.value = '';
     adjustTextareaHeight(); // Adjust height for the user input box
@@ -446,7 +478,7 @@ async function generateResponseForRole(targetRole) {
         promptText += `Please write a response from role ${targetRole}\n\n`;
         promptText += `${targetRole}:`;
 
-        const stopSequences = ["\nUser:", "\nSystem:", "\nNarrator:"]; // Added Narrator
+        const stopSequences = [`\n${userName}:`, "\nSystem:", "\nNarrator:"]; // Added Narrator, dynamically using userName
 
         botRoles.forEach(r => {
             if (r !== targetRole) {
@@ -751,6 +783,9 @@ increaseFontSizeButton.addEventListener('click', increaseFontSize);
 decreaseFontSizeButton.addEventListener('click', decreaseFontSize);
 resetFontSizeButton.addEventListener('click', resetFontSize);
 
+// Event listener for User Name input
+userNameInput.addEventListener('input', setUserName);
+
 // Auto-save on manual edit of the chat box
 chatHistoryBox.addEventListener('blur', saveChatHistory);
 chatHistoryBox.addEventListener('input', adjustChatHistoryHeight);
@@ -758,6 +793,7 @@ chatHistoryBox.addEventListener('input', adjustChatHistoryHeight);
 // --- Boot ---
 window.addEventListener('DOMContentLoaded', () => {
     loadApiKey();
+    loadUserName(); // Load user name first
     loadRolesFromLocalStorage();
     loadChatHistory(); // This also renders chat
     loadSelectedModel();
@@ -767,4 +803,5 @@ window.addEventListener('DOMContentLoaded', () => {
     adjustChatHistoryHeight();
     adjustTextareaHeight(); // Adjust for user message input on load
     adjustNarratorTextareaHeight(); // Adjust for narrator message input on load
+    updateUserMessagePlaceholder(); // Ensure placeholder is correct on load
 });
