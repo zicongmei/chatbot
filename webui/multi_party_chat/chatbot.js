@@ -493,14 +493,26 @@ async function generateResponseForRole(targetRole) {
         promptText += `Please write a response from role ${targetRole}\n\n`;
         promptText += `${targetRole}:`;
 
-        const stopSequences = [`\n${userName}:`, "\nSystem:", "\nNarrator:"]; // Added Narrator, dynamically using userName
+        // Ensure stop_sequences does not exceed 5
+        const stopSequences = [];
+        const MAX_STOP_SEQUENCES = 5;
 
-        botRoles.forEach(r => {
+        // Always include User, System, and Narrator as crucial stop sequences
+        if (stopSequences.length < MAX_STOP_SEQUENCES) stopSequences.push(`\n${userName}:`);
+        if (stopSequences.length < MAX_STOP_SEQUENCES) stopSequences.push("\nSystem:");
+        if (stopSequences.length < MAX_STOP_SEQUENCES) stopSequences.push("\nNarrator:");
+
+        // Add other bot roles as stop sequences, prioritizing by order in botRoles, up to MAX_STOP_SEQUENCES
+        for (const r of botRoles) {
             if (r !== targetRole) {
-                stopSequences.push(`\n${r}:`);
+                if (stopSequences.length < MAX_STOP_SEQUENCES) {
+                    stopSequences.push(`\n${r}:`);
+                } else {
+                    break; // Stop adding if we've reached the limit
+                }
             }
-        });
-
+        }
+        
         const requestBody = {
             contents: [{
                 role: 'user',
