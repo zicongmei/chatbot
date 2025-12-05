@@ -56,6 +56,10 @@ const geminiModelSelect = document.getElementById('geminiModel');
 const chatHistoryBox = document.getElementById('chatHistoryBox'); // Changed to TextArea
 const messageInput = document.getElementById('messageInput');
 const sendUserMessageButton = document.getElementById('sendUserMessageButton');
+// New Narrator elements
+const narratorMessageInput = document.getElementById('narratorMessageInput');
+const sendNarratorMessageButton = document.getElementById('sendNarratorMessageButton');
+
 const stopMessageButton = document.getElementById('stopMessageButton');
 const errorMessageDiv = document.getElementById('errorMessage');
 const tokenStatsDiv = document.getElementById('tokenStats');
@@ -285,10 +289,10 @@ function syncChatHistoryFromUI() {
         const match = line.match(roleRegex);
         if (match) {
             const possibleRole = match[1].trim();
-            if (possibleRole.length < 50) {
+            if (possibleRole.length < 50) { // Arbitrary limit to prevent matching long lines as roles
                 flush();
                 currentSpeaker = possibleRole;
-                buffer.push(match[2]);
+                buffer.push(match[2].trimStart()); // Trim start to remove leading space after colon
                 continue;
             }
         }
@@ -337,9 +341,23 @@ function addUserMessage() {
     chatHistoryBox.value += `${separator}User: ${text}`;
     
     messageInput.value = '';
-    adjustTextareaHeight();
-    adjustChatHistoryHeight(); // Auto expand
+    adjustTextareaHeight(); // Adjust height for the user input box
+    adjustChatHistoryHeight(); // Auto expand the main chat history box
     
+    saveChatHistory();
+}
+
+function addNarratorMessage() {
+    const text = narratorMessageInput.value.trim();
+    if (!text) return;
+
+    const separator = chatHistoryBox.value ? '\n\n' : '';
+    chatHistoryBox.value += `${separator}Narrator: ${text}`;
+
+    narratorMessageInput.value = '';
+    adjustNarratorTextareaHeight(); // Adjust height for the narrator input box
+    adjustChatHistoryHeight(); // Auto expand the main chat history box
+
     saveChatHistory();
 }
 
@@ -428,6 +446,14 @@ async function generateResponseForRole(targetRole) {
         promptText += `Please write a response from role ${targetRole}\n\n`;
         promptText += `${targetRole}:`;
 
+        const stopSequences = ["\nUser:", "\nSystem:", "\nNarrator:"]; // Added Narrator
+
+        botRoles.forEach(r => {
+            if (r !== targetRole) {
+                stopSequences.push(`\n${r}:`);
+            }
+        });
+
         const requestBody = {
             contents: [{
                 role: 'user',
@@ -435,19 +461,12 @@ async function generateResponseForRole(targetRole) {
             }],
             generationConfig: {
                 maxOutputTokens: 8192,
-                stopSequences: ["\nUser:", "\nSystem:"],
+                stopSequences: stopSequences,
                 thinkingConfig: selectedModel.startsWith('gemini-3') 
                     ? { thinkingLevel: thinkingLevel } 
                     : { thinkingBudget: thinkingBudget }
             }
         };
-
-        botRoles.forEach(r => {
-            if (r !== targetRole) {
-                requestBody.generationConfig.stopSequences.push(`\n${r}:`);
-            }
-        });
-        requestBody.generationConfig.stopSequences.push("\nUser:");
 
         lastRawRequestBody = JSON.stringify(requestBody, null, 2);
 
@@ -523,7 +542,10 @@ async function generateResponseForRole(targetRole) {
 }
 
 function toggleInputs(enable) {
+    messageInput.disabled = !enable; // Added: disable user message input
     sendUserMessageButton.disabled = !enable;
+    narratorMessageInput.disabled = !enable; // New
+    sendNarratorMessageButton.disabled = !enable; // New
     const botButtons = document.querySelectorAll('.bot-action-button');
     botButtons.forEach(b => b.disabled = !enable);
     if (chatHistoryBox) chatHistoryBox.disabled = !enable;
@@ -574,6 +596,17 @@ function adjustTextareaHeight() {
         messageInput.style.overflowY = 'auto';
     } else {
         messageInput.style.overflowY = 'hidden';
+    }
+}
+
+function adjustNarratorTextareaHeight() {
+    narratorMessageInput.style.height = 'auto';
+    narratorMessageInput.style.height = (narratorMessageInput.scrollHeight) + 'px';
+    if (narratorMessageInput.scrollHeight > 150) {
+        narratorMessageInput.style.height = '150px';
+        narratorMessageInput.style.overflowY = 'auto';
+    } else {
+        narratorMessageInput.style.overflowY = 'hidden';
     }
 }
 
@@ -683,6 +716,13 @@ messageInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addUserMessage(); }
 });
 messageInput.addEventListener('input', adjustTextareaHeight);
+
+sendNarratorMessageButton.addEventListener('click', addNarratorMessage);
+narratorMessageInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addNarratorMessage(); }
+});
+narratorMessageInput.addEventListener('input', adjustNarratorTextareaHeight);
+
 stopMessageButton.addEventListener('click', () => abortController?.abort());
 
 systemInstructionInput.addEventListener('input', () => {
@@ -725,4 +765,6 @@ window.addEventListener('DOMContentLoaded', () => {
     loadStats();
     loadChatFontSize();
     adjustChatHistoryHeight();
+    adjustTextareaHeight(); // Adjust for user message input on load
+    adjustNarratorTextareaHeight(); // Adjust for narrator message input on load
 });
