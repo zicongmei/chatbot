@@ -238,7 +238,7 @@ function renderBotResponseButtons() {
     botResponseButtonsContainer.innerHTML = '';
     botRoles.forEach(role => {
         const btn = document.createElement('button');
-        btn.textContent = `Response from ${role}`;
+        btn.textContent = `${role}`; // Changed from `Response from ${role}`
         btn.className = 'bot-action-button';
         btn.onclick = () => generateResponseForRole(role);
         botResponseButtonsContainer.appendChild(btn);
