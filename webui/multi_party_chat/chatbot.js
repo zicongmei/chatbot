@@ -277,7 +277,9 @@ function syncChatHistoryFromUI() {
         buffer = [];
     };
 
-    const roleRegex = /^([a-zA-Z0-9_\- ]+):(.*)$/;
+    // Modified regex to support Chinese and other characters in role names
+    // It captures anything up to the first colon as the role name
+    const roleRegex = /^([^:\n]+):(.*)$/;
 
     for (const line of lines) {
         const match = line.match(roleRegex);
