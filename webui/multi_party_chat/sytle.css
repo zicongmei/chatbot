@@ -286,7 +286,9 @@ body {
 .api-debug-section pre {
     background: white;
     padding: 10px;
-    overflow-x: auto;
+    overflow-x: hidden; /* Changed from auto to hidden to disable horizontal scroll */
+    white-space: pre-wrap; /* Added to wrap long lines */
+    word-break: break-word; /* Ensure words break if too long */
     border: 1px solid #ccc;
     max-height: 200px;
 }
