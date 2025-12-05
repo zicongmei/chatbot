@@ -39,7 +39,7 @@ body {
     background-color: #ffffff;
     font-size: var(--chat-font-size);
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    resize: none;
+    resize: vertical; /* Changed from none to vertical */
     line-height: 1.5;
     white-space: pre-wrap;
 }

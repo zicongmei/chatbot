@@ -4,7 +4,7 @@ let chatHistory = []; // Array of { speaker: string, text: string, thoughtSignat
 let botRoles = []; // Array of strings representing role names
 let currentApiKey = '';
 let selectedModel = 'gemini-2.5-flash-lite';
-let systemInstruction = ''; 
+let systemInstruction = 'Your task is to write the messages in this chat/roleplay. Use *asterisks* for actions, and (parantheses) for the internal thought processes of a character. NEVER try to "wrap up" the roleplay. This is a never-ending roleplay. Multi-line messages are not allowed - each individual message must be a single paragraph. Avoid unnecessary and unoriginal repetition of previous messages. Write the next message - remember to make them interesting, authentic, descriptive, natural, engaging, and creative. Use the same language as input or previous diaglog. Do not include the thought in repsonse text.'; 
 
 let totalInputTokens = 0;
 let totalOutputTokens = 0;
@@ -313,6 +313,8 @@ function loadChatHistory() {
     if (s) {
         systemInstruction = s;
         systemInstructionInput.value = s;
+    } else { // If no system instruction is stored, ensure the UI reflects the default
+        systemInstructionInput.value = systemInstruction;
     }
 
     if (h) {
@@ -367,7 +369,6 @@ function clearAllHistory() {
         totalInputTokens = 0; totalOutputTokens = 0; totalCost = 0;
         renderChatHistory();
         renderStats();
-        saveChatHistory();
         saveStats();
     }
 }
@@ -397,10 +398,14 @@ async function generateResponseForRole(targetRole) {
             promptText += systemInstruction + "\n\n";
         }
         
+        promptText += "## Begin of chat history\n\n";
+
         chatHistory.forEach(entry => {
             promptText += `${entry.speaker}: ${entry.text}\n\n`;
         });
         
+        promptText += "## End of chat history\n\n";
+        promptText += `Please write a response from role ${targetRole}\n\n`;
         promptText += `${targetRole}:`;
 
         const requestBody = {
@@ -685,17 +690,6 @@ decreaseFontSizeButton.addEventListener('click', decreaseFontSize);
 resetFontSizeButton.addEventListener('click', resetFontSize);
 
 // Auto-save on manual edit of the chat box
-chatHistoryBox.addEventListener('input', () => {
-    // We don't full sync on every keystroke to avoid perf issues, 
-    // but we can save the raw text to ensure it persists if refreshed.
-    // However, existing logic relies on chatHistory array. 
-    // We will do a lazy sync or just let saveChatHistory() handle it when called by other actions.
-    // BUT user wants edits to be persistent. 
-    // Let's rely on standard events (like beforeunload) or actions.
-    // To be safe, we can sync on blur or periodically.
-    // For now, syncing on every API call is guaranteed. 
-    // To persist manual edits across page refresh, we should sync on 'change' or 'blur'.
-});
 chatHistoryBox.addEventListener('blur', saveChatHistory);
 
 // --- Boot ---
