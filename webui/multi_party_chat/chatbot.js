@@ -375,11 +375,20 @@ async function regenerateLastLine() {
 }
 
 function clearAllHistory() {
-    if (confirm('Clear all chat history?')) {
+    if (confirm('Clear all chat history and remove all roles?')) {
         chatHistory = [];
-        totalInputTokens = 0; totalOutputTokens = 0; totalCost = 0;
+        botRoles = []; // Clear roles
+        totalInputTokens = 0; 
+        totalOutputTokens = 0; 
+        totalCost = 0;
+        
         renderChatHistory();
+        renderRolesList(); // Update UI for roles
+        renderBotResponseButtons(); // Update UI for buttons
         renderStats();
+        
+        saveChatHistory(); // Save the cleared history (and syncs from empty UI)
+        saveRolesToLocalStorage(); // Save the cleared roles
         saveStats();
     }
 }
