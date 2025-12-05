@@ -180,29 +180,26 @@ function updateThinkingControlsVisibility() {
 // --- User Name Management ---
 function loadUserName() {
     const storedName = getLocalStorageItem('userName');
-    if (storedName) {
-        userName = storedName;
+    if (storedName !== null) { // Check if 'userName' key exists in localStorage
+        userName = storedName; // Can be an empty string
         userNameInput.value = storedName;
     } else {
-        userNameInput.value = userName; // Set default in input if not in storage
+        userName = 'User'; // Default if no entry in localStorage
+        userNameInput.value = userName;
     }
     updateUserMessagePlaceholder();
 }
 
 function setUserName() {
     const newName = userNameInput.value.trim();
-    if (newName) {
-        userName = newName;
-    } else {
-        userName = 'User'; // Revert to default if empty
-        userNameInput.value = 'User'; // Also update the input field
-    }
+    userName = newName; // Allow userName to be an empty string
     setLocalStorageItem('userName', userName);
-    updateUserMessagePlaceholder();
+    updateUserMessagePlaceholder(); // This will ensure the placeholder reflects 'User' if userName is empty
 }
 
 function updateUserMessagePlaceholder() {
-    messageInput.placeholder = `Type a message for ${userName}...`;
+    const displayUserName = userName || 'User'; // Use 'User' for display if userName is empty
+    messageInput.placeholder = `Type a message for ${displayUserName}...`;
 }
 
 // --- Font Size ---
