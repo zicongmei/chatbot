@@ -369,13 +369,12 @@ function addUserMessage() {
     const text = messageInput.value.trim();
     if (!text) return;
     
-    const separator = chatHistoryBox.value ? '\n\n' : '';
-    chatHistoryBox.value += `${separator}${userName}: ${text}`;
+    chatHistory.push({ speaker: userName, text: text });
     
     messageInput.value = '';
     adjustTextareaHeight(); // Adjust height for the user input box
-    adjustChatHistoryHeight(); // Auto expand the main chat history box
     
+    renderChatHistory(); // Update chat history box and handle scroll
     saveChatHistory();
 }
 
@@ -383,22 +382,41 @@ function addNarratorMessage() {
     const text = narratorMessageInput.value.trim();
     if (!text) return;
 
-    const separator = chatHistoryBox.value ? '\n\n' : '';
-    chatHistoryBox.value += `${separator}Narrator: ${text}`;
+    chatHistory.push({ speaker: 'Narrator', text: text });
 
     narratorMessageInput.value = '';
     adjustNarratorTextareaHeight(); // Adjust height for the narrator input box
-    adjustChatHistoryHeight(); // Auto expand the main chat history box
 
+    renderChatHistory(); // Update chat history box and handle scroll
     saveChatHistory();
 }
 
 function renderChatHistory() {
     if (!chatHistoryBox) return;
     
+    // 1. Capture current scroll state *before* content changes
+    const currentScrollTop = chatHistoryBox.scrollTop;
+    const currentScrollHeight = chatHistoryBox.scrollHeight;
+    const currentClientHeight = chatHistoryBox.clientHeight;
+    // We consider it "scrolled to bottom" if the scrollbar is within a few pixels of its max position.
+    const isScrolledToBottom = (currentScrollHeight - currentScrollTop - currentClientHeight) < 5; 
+
+    // 2. Update content
     const text = chatHistory.map(entry => `${entry.speaker}: ${entry.text}`).join('\n\n');
     chatHistoryBox.value = text;
-    adjustChatHistoryHeight(); // Auto expand
+
+    // 3. Adjust textarea's CSS height (this might change scrollHeight and clientHeight)
+    adjustChatHistoryHeight(); 
+
+    // 4. Restore/adjust scroll position
+    if (isScrolledToBottom) {
+        // If user was at the bottom, scroll to the new bottom
+        chatHistoryBox.scrollTop = chatHistoryBox.scrollHeight;
+    } else {
+        // Otherwise, attempt to restore the previous scroll position
+        // This is robust for content additions/removals at the end or middle
+        chatHistoryBox.scrollTop = currentScrollTop;
+    }
 }
 
 function removeLastEntry() {
