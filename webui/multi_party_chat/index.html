@@ -19,7 +19,7 @@
             <span>Font Size</span>
         </div>
         
-        <!-- Chat History Area (Editable) -->
+        <!-- Chat History Area (Editable & Auto-expanding) -->
         <textarea class="chat-history-box" id="chatHistoryBox" placeholder="Chat history will appear here. You can edit this text directly..."></textarea>
         <div id="errorMessage" class="error-message"></div>
       
@@ -27,6 +27,21 @@
         <div class="chat-input-area">
             <textarea id="messageInput" placeholder="Type a message for User..." rows="1"></textarea>
             <button id="sendUserMessageButton">Add as User</button>
+        </div>
+
+        <!-- Bot Actions Section (Dynamic Buttons) - MOVED HERE -->
+        <div class="section-box bot-actions-section">
+            <h3>Generate Response</h3>
+            <div id="botResponseButtonsContainer" class="bot-buttons-container">
+                <!-- Buttons like "Response from Mike" will appear here -->
+            </div>
+            <button id="stopMessageButton" class="stop-button hidden">Stop Generation</button>
+        </div>
+
+        <!-- History Actions - Grouped Here -->
+        <div class="chat-actions-section">
+            <button id="removeLastEntryButton">Remove Last Line</button>
+            <button id="regenerateLastLineButton">Regenerate Last Line</button>
         </div>
 
         <!-- Role Management Section -->
@@ -41,16 +56,6 @@
             </div>
         </div>
 
-        <!-- Bot Actions Section (Dynamic Buttons) -->
-        <div class="section-box bot-actions-section">
-            <h3>Generate Response</h3>
-            <div id="botResponseButtonsContainer" class="bot-buttons-container">
-                <!-- Buttons like "Response from Mike" will appear here -->
-            </div>
-            <button id="stopMessageButton" class="stop-button hidden">Stop Generation</button>
-        </div>
-        
-
         <!-- System Instruction -->
         <div class="system-instruction-section">
             <label for="systemInstructionInput">Background / System Context:</label>
@@ -59,15 +64,15 @@
         </div>
 
 
-        <!-- History Actions -->
+        <!-- History Actions - Grouped Here -->
         <div class="chat-actions-section">
-            <button id="removeLastEntryButton">Remove Last Line</button>
             <button id="cleanThinkingSignatureButton">Clean Last Thought</button>
             <button id="saveChatButton">Save to File</button>
             <input type="file" id="loadChatFileInput" accept=".json" style="display: none;">
             <button id="loadChatButton">Load from File</button>
             <button id="clearAllHistoryButton" class="danger-button">Clear All History</button>
         </div>
+
 
         <!-- Config Sections -->
         <div class="api-key-section">

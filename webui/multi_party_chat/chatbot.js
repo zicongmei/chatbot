@@ -71,6 +71,7 @@ const loadChatButton = document.getElementById('loadChatButton');
 const loadChatFileInput = document.getElementById('loadChatFileInput');
 
 const removeLastEntryButton = document.getElementById('removeLastEntryButton');
+const regenerateLastLineButton = document.getElementById('regenerateLastLineButton');
 const clearAllHistoryButton = document.getElementById('clearAllHistoryButton');
 const cleanThinkingSignatureButton = document.getElementById('cleanThinkingSignatureButton');
 
@@ -172,6 +173,7 @@ function updateThinkingControlsVisibility() {
 function updateChatFontSize() {
     document.documentElement.style.setProperty('--chat-font-size', `${chatFontSize}em`);
     setLocalStorageItem('chatFontSize', chatFontSize.toString());
+    adjustChatHistoryHeight(); // Adjust height if font size changes
 }
 function increaseFontSize() { if (chatFontSize < MAX_FONT_SIZE) { chatFontSize += FONT_SIZE_STEP; updateChatFontSize(); } }
 function decreaseFontSize() { if (chatFontSize > MIN_FONT_SIZE) { chatFontSize -= FONT_SIZE_STEP; updateChatFontSize(); } }
@@ -245,6 +247,12 @@ function renderBotResponseButtons() {
 
 // --- Chat History Management ---
 
+function adjustChatHistoryHeight() {
+    if (!chatHistoryBox) return;
+    chatHistoryBox.style.height = 'auto';
+    chatHistoryBox.style.height = (chatHistoryBox.scrollHeight + 10) + 'px';
+}
+
 // Syncs the content of the editable text area back into the chatHistory array
 function syncChatHistoryFromUI() {
     const text = chatHistoryBox.value;
@@ -259,11 +267,6 @@ function syncChatHistoryFromUI() {
             const entryText = buffer.join('\n').trim();
             const newEntry = { speaker: currentSpeaker, text: entryText };
             
-            // Attempt to preserve thoughtSignature from old history if entry is identical
-            // This relies on the index order mostly matching or the user not re-typing identical text
-            // A simple heuristic: check if such an entry existed in old history
-            // For robustness in this simple implementation, we just check exact match in old array
-            // Optimization: could map by content, but simple iteration is okay for typical chat size.
             const existing = chatHistory.find(h => h.speaker === currentSpeaker && h.text === entryText && h.thoughtSignature);
             if (existing) {
                 newEntry.thoughtSignature = existing.thoughtSignature;
@@ -274,19 +277,16 @@ function syncChatHistoryFromUI() {
         buffer = [];
     };
 
-    // Simple parser: looks for "Role:" at start of line
     const roleRegex = /^([a-zA-Z0-9_\- ]+):(.*)$/;
 
     for (const line of lines) {
         const match = line.match(roleRegex);
         if (match) {
-            // Check if it's a valid looking role (heuristic to avoid colons in normal text breaking things)
-            // We assume roles are reasonably short.
             const possibleRole = match[1].trim();
             if (possibleRole.length < 50) {
                 flush();
                 currentSpeaker = possibleRole;
-                buffer.push(match[2]); // The text after the colon
+                buffer.push(match[2]);
                 continue;
             }
         }
@@ -313,7 +313,7 @@ function loadChatHistory() {
     if (s) {
         systemInstruction = s;
         systemInstructionInput.value = s;
-    } else { // If no system instruction is stored, ensure the UI reflects the default
+    } else { 
         systemInstructionInput.value = systemInstruction;
     }
 
@@ -331,27 +331,22 @@ function addUserMessage() {
     const text = messageInput.value.trim();
     if (!text) return;
     
-    // Add to UI directly first
     const separator = chatHistoryBox.value ? '\n\n' : '';
     chatHistoryBox.value += `${separator}User: ${text}`;
     
     messageInput.value = '';
     adjustTextareaHeight();
+    adjustChatHistoryHeight(); // Auto expand
     
-    // Scroll to bottom
-    chatHistoryBox.scrollTop = chatHistoryBox.scrollHeight;
-    
-    // Sync and Save
     saveChatHistory();
 }
 
 function renderChatHistory() {
-    // Converts the array to the text box format
     if (!chatHistoryBox) return;
     
     const text = chatHistory.map(entry => `${entry.speaker}: ${entry.text}`).join('\n\n');
     chatHistoryBox.value = text;
-    chatHistoryBox.scrollTop = chatHistoryBox.scrollHeight;
+    adjustChatHistoryHeight(); // Auto expand
 }
 
 function removeLastEntry() {
@@ -360,6 +355,22 @@ function removeLastEntry() {
         chatHistory.pop();
         renderChatHistory();
         saveChatHistory();
+    }
+}
+
+async function regenerateLastLine() {
+    syncChatHistoryFromUI();
+    if (chatHistory.length === 0) return;
+    
+    const lastEntry = chatHistory[chatHistory.length - 1];
+    if (botRoles.includes(lastEntry.speaker)) {
+        chatHistory.pop();
+        renderChatHistory();
+        saveChatHistory();
+        await generateResponseForRole(lastEntry.speaker);
+    } else {
+        errorMessageDiv.textContent = 'Cannot regenerate: Last message is not from a known Bot role.';
+        setTimeout(() => errorMessageDiv.textContent = '', 3000);
     }
 }
 
@@ -381,10 +392,8 @@ async function generateResponseForRole(targetRole) {
         return;
     }
 
-    // Capture any manual edits before generation
     syncChatHistoryFromUI();
 
-    // Disable UI
     toggleInputs(false);
     errorMessageDiv.textContent = `Thinking for ${targetRole}...`;
     stopMessageButton.disabled = false;
@@ -480,7 +489,6 @@ async function generateResponseForRole(targetRole) {
             if (thoughtSignature) newEntry.thoughtSignature = thoughtSignature;
             chatHistory.push(newEntry);
             
-            // Append to UI (safer than full render to preserve scroll position context if needed, but render is consistent)
             renderChatHistory();
             saveChatHistory();
         }
@@ -508,6 +516,8 @@ function toggleInputs(enable) {
     const botButtons = document.querySelectorAll('.bot-action-button');
     botButtons.forEach(b => b.disabled = !enable);
     if (chatHistoryBox) chatHistoryBox.disabled = !enable;
+    removeLastEntryButton.disabled = !enable;
+    regenerateLastLineButton.disabled = !enable;
 }
 
 // --- Utils & Stats ---
@@ -679,6 +689,7 @@ loadChatButton.addEventListener('click', () => loadChatFileInput.click());
 loadChatFileInput.addEventListener('change', handleFileLoad);
 
 removeLastEntryButton.addEventListener('click', removeLastEntry);
+regenerateLastLineButton.addEventListener('click', regenerateLastLine);
 clearAllHistoryButton.addEventListener('click', clearAllHistory);
 cleanThinkingSignatureButton.addEventListener('click', cleanThinkingSignature);
 cleanupAllThoughtSignaturesButton.addEventListener('click', cleanupAllThoughtSignatures);
@@ -691,6 +702,7 @@ resetFontSizeButton.addEventListener('click', resetFontSize);
 
 // Auto-save on manual edit of the chat box
 chatHistoryBox.addEventListener('blur', saveChatHistory);
+chatHistoryBox.addEventListener('input', adjustChatHistoryHeight);
 
 // --- Boot ---
 window.addEventListener('DOMContentLoaded', () => {
@@ -701,4 +713,5 @@ window.addEventListener('DOMContentLoaded', () => {
     loadThinkingConfig();
     loadStats();
     loadChatFontSize();
+    adjustChatHistoryHeight();
 });
