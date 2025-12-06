@@ -445,6 +445,11 @@ function clearAllHistory() {
     if (confirm('Clear all chat history and remove all roles?')) {
         chatHistory = [];
         botRoles = []; // Clear roles
+        userName = 'User'; // Reset user name to default
+        userNameInput.value = userName; // Update the input field
+        setUserName(); // Save the default user name to local storage
+        updateUserMessagePlaceholder(); // Update the placeholder text
+        
         totalInputTokens = 0; 
         totalOutputTokens = 0; 
         totalCost = 0;
