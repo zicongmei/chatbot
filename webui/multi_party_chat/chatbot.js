@@ -585,6 +585,10 @@ async function generateResponseForRole(targetRole) {
             
             renderChatHistory();
             saveChatHistory();
+
+            setTimeout(() => {
+                chatHistoryBox.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            }, 100);
         }
 
         errorMessageDiv.textContent = '';
