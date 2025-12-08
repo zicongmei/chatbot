@@ -703,11 +703,16 @@ function handleFileLoad(e) {
             if (Array.isArray(data.chatHistory)) {
                 chatHistory = data.chatHistory;
             }
-            saveRolesToLocalStorage();
-            saveChatHistory();
+            
+            // Fix: Render UI first so that the UI state matches the loaded data.
+            // saveChatHistory calls syncChatHistoryFromUI, which reads from the UI.
+            // If we save before rendering, we overwrite the loaded data with the old UI state.
             renderRolesList();
             renderBotResponseButtons();
             renderChatHistory();
+
+            saveRolesToLocalStorage();
+            saveChatHistory();
         } catch (err) {
             errorMessageDiv.textContent = 'Error loading file: ' + err.message;
             setTimeout(() => errorMessageDiv.textContent = '', 3000);
