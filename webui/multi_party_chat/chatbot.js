@@ -100,7 +100,7 @@ const resetFontSizeButton = document.getElementById('resetFontSizeButton');
 const newRoleNameInput = document.getElementById('newRoleNameInput');
 const addRoleButton = document.getElementById('addRoleButton');
 const activeRolesList = document.getElementById('activeRolesList');
-const botResponseButtonsContainer = document.getElementById('botResponseButtonsContainer');
+const responseGenerationButtonsContainer = document.getElementById('responseGenerationButtonsContainer'); // Renamed
 
 // New DOM Element for User Name
 const userNameInput = document.getElementById('userNameInput');
@@ -195,6 +195,7 @@ function setUserName() {
     userName = newName; // Allow userName to be an empty string
     setLocalStorageItem('userName', userName);
     updateUserMessagePlaceholder(); // This will ensure the placeholder reflects 'User' if userName is empty
+    renderBotResponseButtons(); // Re-render buttons to update User's name if changed
 }
 
 function updateUserMessagePlaceholder() {
@@ -268,13 +269,22 @@ function renderRolesList() {
 }
 
 function renderBotResponseButtons() {
-    botResponseButtonsContainer.innerHTML = '';
+    responseGenerationButtonsContainer.innerHTML = '';
+
+    // Add User response button
+    const userBtn = document.createElement('button');
+    userBtn.textContent = `Generate as ${userName || 'User'}`;
+    userBtn.className = 'bot-action-button';
+    userBtn.onclick = () => generateResponseForRole(userName);
+    responseGenerationButtonsContainer.appendChild(userBtn);
+
+    // Add Bot roles response buttons
     botRoles.forEach(role => {
         const btn = document.createElement('button');
-        btn.textContent = `${role}`; // Changed from `Response from ${role}`
+        btn.textContent = `Generate as ${role}`; 
         btn.className = 'bot-action-button';
         btn.onclick = () => generateResponseForRole(role);
-        botResponseButtonsContainer.appendChild(btn);
+        responseGenerationButtonsContainer.appendChild(btn);
     });
 }
 
@@ -300,6 +310,7 @@ function syncChatHistoryFromUI() {
             const entryText = buffer.join('\n').trim();
             const newEntry = { speaker: currentSpeaker, text: entryText };
             
+            // Try to preserve thoughtSignature if an existing entry matches
             const existing = chatHistory.find(h => h.speaker === currentSpeaker && h.text === entryText && h.thoughtSignature);
             if (existing) {
                 newEntry.thoughtSignature = existing.thoughtSignature;
@@ -430,13 +441,15 @@ async function regenerateLastLine() {
     if (chatHistory.length === 0) return;
     
     const lastEntry = chatHistory[chatHistory.length - 1];
-    if (botRoles.includes(lastEntry.speaker)) {
+    // Allow regeneration for any role that can be generated (User, Narrator, or BotRoles)
+    const generatableRoles = [userName, 'Narrator', ...botRoles];
+    if (generatableRoles.includes(lastEntry.speaker)) {
         chatHistory.pop();
         renderChatHistory();
         saveChatHistory();
         await generateResponseForRole(lastEntry.speaker);
     } else {
-        errorMessageDiv.textContent = 'Cannot regenerate: Last message is not from a known Bot role.';
+        errorMessageDiv.textContent = 'Cannot regenerate: Last message is not from a generatable role (User, Narrator, or Bot).';
         setTimeout(() => errorMessageDiv.textContent = '', 3000);
     }
 }
@@ -447,7 +460,7 @@ function clearAllHistory() {
         botRoles = []; // Clear roles
         userName = 'User'; // Reset user name to default
         userNameInput.value = userName; // Update the input field
-        setUserName(); // Save the default user name to local storage
+        setUserName(); // Save the default user name to local storage, and re-render buttons
         updateUserMessagePlaceholder(); // Update the placeholder text
         
         totalInputTokens = 0; 
@@ -502,18 +515,31 @@ async function generateResponseForRole(targetRole) {
         const stopSequences = [];
         const MAX_STOP_SEQUENCES = 5;
 
-        // Always include User, System, and Narrator as crucial stop sequences
-        if (stopSequences.length < MAX_STOP_SEQUENCES) stopSequences.push(`\n${userName}:`);
-        if (stopSequences.length < MAX_STOP_SEQUENCES) stopSequences.push("\nSystem:");
-        if (stopSequences.length < MAX_STOP_SEQUENCES) stopSequences.push("\nNarrator:");
+        // Collect all possible speakers for stop sequences
+        const allPossibleSpeakers = new Set();
+        allPossibleSpeakers.add(userName);
+        allPossibleSpeakers.add('Narrator');
+        allPossibleSpeakers.add('System'); // System is not a speaker in chatHistory but good for stop sequence
+        botRoles.forEach(role => allPossibleSpeakers.add(role));
+        
+        // Add speakers as stop sequences, excluding the targetRole
+        // Prioritize System, Narrator, then User, then botRoles alphabetically
+        const sortedSpeakers = Array.from(allPossibleSpeakers).sort((a, b) => {
+            if (a === 'System') return -1;
+            if (b === 'System') return 1;
+            if (a === 'Narrator') return -1;
+            if (b === 'Narrator') return 1;
+            if (a === userName && b !== 'System' && b !== 'Narrator') return -1; // User is next priority
+            if (b === userName && a !== 'System' && a !== 'Narrator') return 1;
+            return a.localeCompare(b); // Alphabetical for other roles
+        });
 
-        // Add other bot roles as stop sequences, prioritizing by order in botRoles, up to MAX_STOP_SEQUENCES
-        for (const r of botRoles) {
-            if (r !== targetRole) {
+        for (const speaker of sortedSpeakers) {
+            if (speaker !== targetRole) {
                 if (stopSequences.length < MAX_STOP_SEQUENCES) {
-                    stopSequences.push(`\n${r}:`);
+                    stopSequences.push(`\n${speaker}:`);
                 } else {
-                    break; // Stop adding if we've reached the limit
+                    break; 
                 }
             }
         }
@@ -574,6 +600,7 @@ async function generateResponseForRole(targetRole) {
         }
 
         responseText = responseText.trim();
+        // Remove leading "Role Name:" if the model added it
         if (responseText.startsWith(targetRole + ':')) {
             responseText = responseText.substring(targetRole.length + 1).trim();
         }
@@ -682,7 +709,7 @@ function adjustNarratorTextareaHeight() {
 
 function downloadChat() {
     syncChatHistoryFromUI();
-    const data = { systemInstruction, roles: botRoles, chatHistory };
+    const data = { systemInstruction, roles: botRoles, chatHistory, userName }; // Include userName in save
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -707,6 +734,11 @@ function handleFileLoad(e) {
             if (Array.isArray(data.chatHistory)) {
                 chatHistory = data.chatHistory;
             }
+            if (typeof data.userName === 'string') { // Load userName
+                userName = data.userName;
+                userNameInput.value = userName;
+                updateUserMessagePlaceholder();
+            }
             
             // Fix: Render UI first so that the UI state matches the loaded data.
             // saveChatHistory calls syncChatHistoryFromUI, which reads from the UI.
@@ -717,6 +749,7 @@ function handleFileLoad(e) {
 
             saveRolesToLocalStorage();
             saveChatHistory();
+            setUserName(); // Call setUserName to ensure new userName is saved and reflected
         } catch (err) {
             errorMessageDiv.textContent = 'Error loading file: ' + err.message;
             setTimeout(() => errorMessageDiv.textContent = '', 3000);
