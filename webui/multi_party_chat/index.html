@@ -25,13 +25,13 @@
 
         <!-- User Input Area -->
         <div class="chat-input-area">
-            <textarea id="messageInput" placeholder="Type a message..." rows="1"></textarea>
+            <textarea id="messageInput" placeholder="Type a message..." rows="1" autocomplete="off"></textarea>
             <button id="sendUserMessageButton">Add as User</button>
         </div>
 
         <!-- Narrator Input Area -->
         <div class="chat-input-area">
-            <textarea id="narratorMessageInput" placeholder="Type a message for Narrator..." rows="1"></textarea>
+            <textarea id="narratorMessageInput" placeholder="Type a message for Narrator..." rows="1" autocomplete="off"></textarea>
             <button id="sendNarratorMessageButton">Add as Narrator</button>
         </div>
 
@@ -54,7 +54,7 @@
         <div class="section-box role-management-section">
             <h3>Role Management</h3>
             <div class="add-role-controls">
-                <input type="text" id="newRoleNameInput" placeholder="Enter Bot Name (e.g. Mike)">
+                <input type="text" id="newRoleNameInput" placeholder="Enter Bot Name (e.g. Mike)" autocomplete="off">
                 <button id="addRoleButton">Add Role</button>
             </div>
             <div id="activeRolesList" class="active-roles-list">
@@ -65,13 +65,13 @@
         <!-- User Name Section -->
         <div class="user-name-section">
             <label for="userNameInput">Your Name:</label>
-            <input id="userNameInput" type="text" value="User">
+            <input id="userNameInput" type="text" value="User" autocomplete="off">
         </div>
       
         <!-- System Instruction -->
         <div class="system-instruction-section">
             <label for="systemInstructionInput">Background / System Context:</label>
-            <textarea id="systemInstructionInput" placeholder="Define the setting, scenario, or shared context for all characters...">Your task is to write the messages in this chat/roleplay. Use *asterisks* for actions, and (parantheses) for the internal thought processes of a character. NEVER try to "wrap up" the roleplay. This is a never-ending roleplay. Multi-line messages are not allowed - each individual message must be a single paragraph. Avoid unnecessary and unoriginal repetition of previous messages. Write the next message - remember to make them interesting, authentic, descriptive, natural, engaging, and creative. Use the same language as input or previous diaglog. Do not include the thought in repsonse text.</textarea>
+            <textarea id="systemInstructionInput" placeholder="Define the setting, scenario, or shared context for all characters..." autocomplete="off">Your task is to write the messages in this chat/roleplay. Use *asterisks* for actions, and (parantheses) for the internal thought processes of a character. NEVER try to "wrap up" the roleplay. This is a never-ending roleplay. Multi-line messages are not allowed - each individual message must be a single paragraph. Avoid unnecessary and unoriginal repetition of previous messages. Write the next message - remember to make them interesting, authentic, descriptive, natural, engaging, and creative. Use the same language as input or previous diaglog. Do not include the thought in repsonse text.</textarea>
             <button id="clearSystemInstructionButton">Clear Context</button>
         </div>
 
@@ -89,7 +89,7 @@
         <!-- Config Sections -->
         <div class="api-key-section">
             <label for="geminiApiKey">Gemini API Key:</label>
-            <input id="geminiApiKey" type="text" placeholder="Enter Key">
+            <input id="geminiApiKey" type="text" placeholder="Enter Key" autocomplete="off">
             <button id="setApiKeyButton">Set</button>
         </div>
 
@@ -107,7 +107,7 @@
         <div id="thinkingConfigSection" class="thinking-config-section">
             <div class="thinking-control-container hidden">
                 <label for="thinkingBudgetInput">Thinking Budget:</label>
-                <input id="thinkingBudgetInput" type="number" value="-1" min="-1">
+                <input id="thinkingBudgetInput" type="number" value="-1" min="-1" autocomplete="off">
             </div>
             <div class="thinking-control-container hidden">
                 <label for="thinkingLevelSelect">Thinking Level:</label>
