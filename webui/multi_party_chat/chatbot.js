@@ -273,7 +273,7 @@ function renderBotResponseButtons() {
 
     // Add User response button
     const userBtn = document.createElement('button');
-    userBtn.textContent = `Generate as ${userName || 'User'}`;
+    userBtn.textContent = `${userName || 'User'}`;
     userBtn.className = 'bot-action-button';
     userBtn.onclick = () => generateResponseForRole(userName);
     responseGenerationButtonsContainer.appendChild(userBtn);
@@ -281,7 +281,7 @@ function renderBotResponseButtons() {
     // Add Bot roles response buttons
     botRoles.forEach(role => {
         const btn = document.createElement('button');
-        btn.textContent = `Generate as ${role}`; 
+        btn.textContent = `${role}`; 
         btn.className = 'bot-action-button';
         btn.onclick = () => generateResponseForRole(role);
         responseGenerationButtonsContainer.appendChild(btn);
